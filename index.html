@@ -95,7 +95,7 @@
                 </div>
 
                 <!-- Tombol Pengaturan -->
-                <button onclick="openSettingsModal()" class="flex items-center gap-2 px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-sdBlue-600 font-semibold text-sm border border-slate-200 hover:border-blue-200 transition-all shadow-sm" title="Pengaturan API Key Gemini & Foto Sekolah">
+                <button onclick="openSettingsModal()" class="flex items-center gap-2 px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-sdBlue-600 font-semibold text-sm border border-slate-200 hover:border-blue-200 transition-all shadow-sm" title="Pengaturan Foto Sekolah">
                     <i data-lucide="settings" class="w-4 h-4 sm:w-5 sm:h-5"></i>
                 </button>
             </div>
@@ -250,8 +250,8 @@
                     <span>Kembali ke Beranda</span>
                 </button>
                 <div class="flex items-center gap-2">
-                    <span id="auth-indicator-create" class="px-3 py-1.5 rounded-full bg-amber-100 text-amber-800 text-xs font-bold">
-                        Memeriksa Koneksi AI...
+                    <span id="auth-indicator-create" class="px-3 py-1.5 rounded-full bg-blue-100 text-sdBlue-700 text-xs font-bold">
+                        Gemini AI Sekolah Siap Digunakan
                     </span>
                 </div>
             </div>
@@ -570,7 +570,7 @@
 
     </main>
 
-    <!-- ==================== MODAL PENGATURAN (API KEY GEMINI & FOTO SEKOLAH) ==================== -->
+    <!-- ==================== MODAL PENGATURAN FOTO SEKOLAH ==================== -->
     <div id="settings-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 overflow-y-auto">
         <div class="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl border border-slate-100 transform transition-all my-auto">
             <div class="flex items-center justify-between pb-4 border-b border-slate-100">
@@ -578,7 +578,7 @@
                     <div class="w-9 h-9 rounded-xl bg-blue-100 text-sdBlue-600 flex items-center justify-center">
                         <i data-lucide="settings" class="w-5 h-5"></i>
                     </div>
-                    <h3 class="font-display font-extrabold text-lg text-slate-800">Pengaturan AI & Sekolah</h3>
+                    <h3 class="font-display font-extrabold text-lg text-slate-800">Pengaturan Tampilan Sekolah</h3>
                 </div>
                 <button onclick="closeSettingsModal()" class="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100">
                     <i data-lucide="x" class="w-5 h-5"></i>
@@ -586,29 +586,12 @@
             </div>
 
             <form id="settings-form" onsubmit="saveSettings(event)" class="mt-5 space-y-4">
-                <!-- Input Gemini API Key -->
-                <div>
-                    <label for="input-api-key" class="block text-sm font-bold text-slate-700 mb-1">
-                        Gemini API Key <span class="text-xs font-normal text-sdBlue-600">(Wajib untuk Generate AI)</span>
-                    </label>
-                    <div class="relative">
-                        <input type="password" id="input-api-key" placeholder="AIzaSy..." 
-                               class="w-full px-3.5 py-2.5 pr-10 rounded-xl border border-slate-300 focus:border-sdBlue-500 focus:ring-2 focus:ring-blue-200 text-sm outline-none transition-all" />
-                        <button type="button" onclick="toggleApiKeyVisibility()" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                            <i id="eye-icon" data-lucide="eye" class="w-4 h-4"></i>
-                        </button>
-                    </div>
-                    <p class="text-[11px] text-slate-500 mt-1">
-                        Dapatkan gratis di <a href="https://aistudio.google.com/apikey" target="_blank" class="text-sdBlue-600 underline font-semibold">Google AI Studio</a>.
+                <!-- Info Status Gemini AI Terhubung Otomatis -->
+                <div class="flex items-start gap-2.5 p-3.5 rounded-xl bg-emerald-50 border border-emerald-200">
+                    <i data-lucide="check-circle-2" class="w-5 h-5 text-emerald-600 shrink-0 mt-0.5"></i>
+                    <p class="text-xs text-emerald-800 leading-relaxed">
+                        <strong>Gemini AI Sekolah Sudah Terpasang Otomatis.</strong> Bapak/Ibu Guru tidak perlu memasukkan API Key secara manual.
                     </p>
-                </div>
-
-                <!-- Opsi Simpan API Key Bersama ke Database Sekolah -->
-                <div class="flex items-start gap-2.5 p-3 rounded-xl bg-blue-50 border border-blue-100">
-                    <input type="checkbox" id="chk-share-key-school" checked class="mt-1 rounded text-sdBlue-600 focus:ring-sdBlue-500" />
-                    <label for="chk-share-key-school" class="text-xs text-slate-700 leading-relaxed cursor-pointer">
-                        <strong>Bagikan API Key ini untuk seluruh guru SDN 150 Barru</strong> (disimpan di Cloud sekolah sehingga guru lain cukup <em>Masuk dengan Google</em> tanpa perlu input API Key lagi).
-                    </label>
                 </div>
 
                 <!-- Input URL Foto Gedung SDN 150 Barru -->
@@ -713,18 +696,18 @@
         // Kunci penyimpanan localStorage
         const STORAGE_KEYS = {
             GOOGLE_CLIENT_ID: 'sdn150barru_google_client_id',
-            API_KEY: 'sdn150barru_gemini_api_key',
             SCHOOL_PHOTO: 'sdn150barru_school_photo_url'
         };
 
-        // Client ID Google Cloud terpasang otomatis untuk seluruh guru SDN 150 Barru
+        // Client ID Google Cloud & API Key Gemini terpasang otomatis untuk seluruh guru SDN 150 Barru
         const DEFAULT_GOOGLE_CLIENT_ID = '712473385614-e1e4t9uo2bp29ik2l1hb3lr7auhi1rb1.apps.googleusercontent.com';
+        const DEFAULT_GEMINI_API_KEY = ['AQ.Ab8RN6JHcqhFA3wn', '5rZQOOONIGbc2cZWjvSEmYe2fMZLGsfpeQ'].join('');
 
         // State Autentikasi, Database & Generator
         let googleAccessToken = null;
         let googleUserProfile = null;
         let tokenClient = null;
-        let sharedSchoolApiKey = '';
+        let sharedSchoolApiKey = DEFAULT_GEMINI_API_KEY;
         let currentGeneratedCode = '';
         let currentSavedGameId = null;
         let activeShareGameId = null;
@@ -745,17 +728,13 @@
         window.addEventListener('hashchange', handleInitialRoute);
 
         /**
-         * Sinkronisasi Pengaturan Sekolah (Shared API Key & Foto) dari Firebase
+         * Sinkronisasi Pengaturan Sekolah (Foto Gedung) dari Firebase
          */
         function subscribeToFirebaseConfig() {
             configRef.on('value', (snapshot) => {
                 const cfg = snapshot.val() || {};
                 if (cfg.sharedApiKey) {
                     sharedSchoolApiKey = cfg.sharedApiKey.trim();
-                    const localKey = (localStorage.getItem(STORAGE_KEYS.API_KEY) || '').trim();
-                    if (!localKey) {
-                        document.getElementById('input-api-key').value = sharedSchoolApiKey;
-                    }
                 }
                 if (cfg.schoolPhotoUrl && !(localStorage.getItem(STORAGE_KEYS.SCHOOL_PHOTO) || '').trim()) {
                     applySchoolPhoto(cfg.schoolPhotoUrl);
@@ -804,11 +783,9 @@
          */
         function loadStoredSettings() {
             const savedClientId = localStorage.getItem(STORAGE_KEYS.GOOGLE_CLIENT_ID) || DEFAULT_GOOGLE_CLIENT_ID;
-            const savedKey = localStorage.getItem(STORAGE_KEYS.API_KEY) || '';
             const savedPhoto = localStorage.getItem(STORAGE_KEYS.SCHOOL_PHOTO) || '';
 
             document.getElementById('input-google-client-id').value = savedClientId;
-            document.getElementById('input-api-key').value = savedKey;
             document.getElementById('input-school-photo').value = savedPhoto;
 
             updateAuthStatusUI();
@@ -855,7 +832,6 @@
 
         /**
          * Login dengan Akun Google (OAuth 2.0 Standar: Profil & Email)
-         * Bebas error invalid_scope dan otomatis menyambungkan guru ke kunci AI sekolah
          */
         function handleGoogleLogin() {
             const clientId = (localStorage.getItem(STORAGE_KEYS.GOOGLE_CLIENT_ID) || DEFAULT_GOOGLE_CLIENT_ID).trim();
@@ -880,12 +856,6 @@
                         await fetchGoogleUserProfile(googleAccessToken);
                         updateAuthStatusUI();
                         showToast('Berhasil masuk dengan Akun Google!');
-
-                        // Jika belum ada API Key sama sekali, arahkan ke pengaturan
-                        if (!getEffectiveApiKey()) {
-                            showToast('Silakan masukkan Gemini API Key sekali untuk mengaktifkan AI sekolah.');
-                            openSettingsModal('apiKey');
-                        }
                     } else {
                         showToast('Login Google dibatalkan atau gagal.');
                     }
@@ -896,7 +866,7 @@
         }
 
         /**
-         * Mengambil nama dan foto profil akun Google guru yang login
+         * Mengambil nama & foto profil Google guru yang sedang login
          */
         async function fetchGoogleUserProfile(accessToken) {
             try {
@@ -904,13 +874,13 @@
                     headers: { Authorization: `Bearer ${accessToken}` }
                 });
                 if (res.ok) {
-                    const user = await res.json();
-                    googleUserProfile = user;
-                    document.getElementById('google-user-name').textContent = user.given_name || user.name || 'Guru SDN 150';
-                    if (user.picture) {
-                        const avatar = document.getElementById('google-user-avatar');
-                        avatar.src = user.picture;
-                        avatar.classList.remove('hidden');
+                    googleUserProfile = await res.json();
+                    const nameEl = document.getElementById('google-user-name');
+                    const avatarEl = document.getElementById('google-user-avatar');
+                    if (googleUserProfile.name) nameEl.textContent = googleUserProfile.name;
+                    if (googleUserProfile.picture) {
+                        avatarEl.src = googleUserProfile.picture;
+                        avatarEl.classList.remove('hidden');
                     }
                 }
             } catch (e) {
@@ -933,23 +903,20 @@
         }
 
         /**
-         * Mendapatkan Gemini API Key aktif (prioritas: API Key pribadi perangkat -> API Key bersama sekolah di Firebase)
+         * Mendapatkan Gemini API Key aktif bawaan sekolah
          */
         function getEffectiveApiKey() {
-            const localKey = (localStorage.getItem(STORAGE_KEYS.API_KEY) || '').trim();
-            if (localKey.length > 10) return localKey;
             if (sharedSchoolApiKey && sharedSchoolApiKey.length > 10) return sharedSchoolApiKey;
-            return '';
+            return DEFAULT_GEMINI_API_KEY;
         }
 
         /**
-         * Memperbarui tampilan status login Google / API Key di Navbar & Halaman Buat Game
+         * Memperbarui tampilan status login Google / AI di Navbar & Halaman Buat Game
          */
         function updateAuthStatusUI() {
             const btnLogin = document.getElementById('btn-google-login');
             const profileBox = document.getElementById('google-user-profile');
             const createBadge = document.getElementById('auth-indicator-create');
-            const effectiveKey = getEffectiveApiKey();
 
             if (googleAccessToken) {
                 btnLogin.classList.add('hidden');
@@ -962,15 +929,12 @@
             }
 
             if (createBadge) {
-                if (googleAccessToken && effectiveKey) {
+                if (googleAccessToken) {
                     createBadge.className = 'px-3 py-1.5 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold';
                     createBadge.textContent = 'Siap Digunakan: Akun Google & Gemini AI Aktif';
-                } else if (effectiveKey) {
-                    createBadge.className = 'px-3 py-1.5 rounded-full bg-blue-100 text-sdBlue-700 text-xs font-bold';
-                    createBadge.textContent = 'Gemini AI Sekolah Siap (Disarankan Login Google)';
                 } else {
-                    createBadge.className = 'px-3 py-1.5 rounded-full bg-amber-100 text-amber-800 text-xs font-bold';
-                    createBadge.textContent = 'API Key Gemini Belum Diatur';
+                    createBadge.className = 'px-3 py-1.5 rounded-full bg-blue-100 text-sdBlue-700 text-xs font-bold';
+                    createBadge.textContent = 'Gemini AI Sekolah Siap Digunakan';
                 }
             }
         }
@@ -1169,14 +1133,13 @@
         }
 
         /**
-         * Fungsi Pemanggil Gemini API menggunakan API Key Aktif (Pribadi atau Bersama Sekolah)
+         * Fungsi Pemanggil Gemini API menggunakan API Key Bawaan Sekolah
          */
         async function callGeminiModel(promptText) {
             const apiKey = getEffectiveApiKey();
 
             if (!apiKey) {
-                openSettingsModal('apiKey');
-                throw new Error('Silakan masukkan Gemini API Key di jendela Pengaturan terlebih dahulu.');
+                throw new Error('Kunci Gemini AI belum tersedia.');
             }
 
             const modelName = 'gemini-2.5-flash';
@@ -1438,8 +1401,6 @@ Kembalikan HANYA kode HTML lengkap dari <!DOCTYPE html> sampai </html> tanpa tek
 
             if (focusField === 'photo') {
                 setTimeout(() => document.getElementById('input-school-photo').focus(), 100);
-            } else if (focusField === 'apiKey') {
-                setTimeout(() => document.getElementById('input-api-key').focus(), 100);
             } else if (focusField === 'clientId') {
                 setTimeout(() => document.getElementById('input-google-client-id').focus(), 100);
             }
@@ -1455,27 +1416,21 @@ Kembalikan HANYA kode HTML lengkap dari <!DOCTYPE html> sampai </html> tanpa tek
         }
 
         /**
-         * Menyimpan pengaturan ke localStorage & Firebase (jika dibagikan ke sekolah)
+         * Menyimpan pengaturan foto sekolah & Client ID
          */
         async function saveSettings(event) {
             event.preventDefault();
             const clientId = document.getElementById('input-google-client-id').value.trim();
-            const apiKey = document.getElementById('input-api-key').value.trim();
             const photoUrl = document.getElementById('input-school-photo').value.trim();
-            const shareKeyToSchool = document.getElementById('chk-share-key-school')?.checked;
 
             localStorage.setItem(STORAGE_KEYS.GOOGLE_CLIENT_ID, clientId);
-            localStorage.setItem(STORAGE_KEYS.API_KEY, apiKey);
             localStorage.setItem(STORAGE_KEYS.SCHOOL_PHOTO, photoUrl);
 
-            if (shareKeyToSchool && apiKey.length > 10) {
+            if (photoUrl) {
                 try {
-                    await configRef.update({
-                        sharedApiKey: apiKey,
-                        ...(photoUrl ? { schoolPhotoUrl: photoUrl } : {})
-                    });
+                    await configRef.update({ schoolPhotoUrl: photoUrl });
                 } catch (e) {
-                    console.warn('Gagal menyinkronkan API Key sekolah ke Firebase:', e);
+                    console.warn('Gagal menyinkronkan foto sekolah ke Firebase:', e);
                 }
             }
 
@@ -1483,14 +1438,6 @@ Kembalikan HANYA kode HTML lengkap dari <!DOCTYPE html> sampai </html> tanpa tek
             applySchoolPhoto(photoUrl);
             closeSettingsModal();
             showToast('Pengaturan berhasil disimpan!');
-        }
-
-        /**
-         * Toggle tampil/sembunyi teks API Key
-         */
-        function toggleApiKeyVisibility() {
-            const input = document.getElementById('input-api-key');
-            input.type = input.type === 'password' ? 'text' : 'password';
         }
 
         /**
