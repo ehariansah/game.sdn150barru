@@ -444,8 +444,12 @@
                                 <div class="w-14 h-14 border-4 border-blue-200 border-t-sdBlue-600 rounded-full animate-spin mb-4"></div>
                                 <h3 class="font-display font-extrabold text-lg text-sdBlue-700">Gemini AI Sedang Merakit Game...</h3>
                                 <p id="loading-subtext" class="text-xs sm:text-sm text-slate-500 max-w-sm mt-1">
-                                    Menyusun soal, logika permainan, dan tampilan ramah anak SD. Mohon tunggu sekitar 10–20 detik.
+                                    Menyusun soal, logika permainan, dan tampilan ramah anak SD...
                                 </p>
+                                <p id="loading-timer-text" class="text-xs font-bold text-sdBlue-600 mt-2">Waktu berjalan: 0 detik</p>
+                                <button type="button" onclick="cancelActiveGeneration()" class="mt-4 px-4 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 font-bold text-xs border border-red-200 transition-all">
+                                    Batalkan Proses
+                                </button>
                             </div>
 
                             <!-- Iframe Tempat Game Berjalan -->
@@ -713,6 +717,8 @@
         let activeShareGameId = null;
         let cachedGamesList = [];
         let isFirebaseLoaded = false;
+        let activeAbortController = null;
+        let loadingIntervalId = null;
         const MAX_SAVED_GAMES = 50;
 
         // Inisialisasi saat halaman dimuat
@@ -728,412 +734,7 @@
         window.addEventListener('hashchange', handleInitialRoute);
 
         /**
-         * Sinkronisasi Pengaturan Sekolah (Foto Gedung) dari Firebase
-         */
-        function subscribeToFirebaseConfig() {
-            configRef.on('value', (snapshot) => {
-                const cfg = snapshot.val() || {};
-                if (cfg.sharedApiKey) {
-                    sharedSchoolApiKey = cfg.sharedApiKey.trim();
-                }
-                if (cfg.schoolPhotoUrl && !(localStorage.getItem(STORAGE_KEYS.SCHOOL_PHOTO) || '').trim()) {
-                    applySchoolPhoto(cfg.schoolPhotoUrl);
-                }
-                updateAuthStatusUI();
-            });
-        }
-
-        /**
-         * Sinkronisasi Real-time daftar game dengan Firebase Realtime Database
-         */
-        function subscribeToFirebaseGames() {
-            gamesRef.on('value', (snapshot) => {
-                const rawVal = snapshot.val();
-                const list = [];
-                if (rawVal) {
-                    Object.keys(rawVal).forEach(key => {
-                        list.push({
-                            id: key,
-                            ...rawVal[key]
-                        });
-                    });
-                }
-                list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-                cachedGamesList = list;
-                isFirebaseLoaded = true;
-
-                renderLibraryList();
-
-                const currentHash = window.location.hash.replace('#', '');
-                if (currentHash.startsWith('play=')) {
-                    const targetId = currentHash.split('=')[1];
-                    const playSection = document.getElementById('page-play');
-                    if (playSection && playSection.classList.contains('hidden')) {
-                        openGameInFullscreen(targetId);
-                    }
-                }
-            }, (error) => {
-                console.error('Firebase Read Error:', error);
-                showToast('Gagal memuat data dari Firebase. Periksa koneksi internet Anda.');
-            });
-        }
-
-        /**
-         * Memuat pengaturan tersimpan di perangkat
-         */
-        function loadStoredSettings() {
-            const savedClientId = localStorage.getItem(STORAGE_KEYS.GOOGLE_CLIENT_ID) || DEFAULT_GOOGLE_CLIENT_ID;
-            const savedPhoto = localStorage.getItem(STORAGE_KEYS.SCHOOL_PHOTO) || '';
-
-            document.getElementById('input-google-client-id').value = savedClientId;
-            document.getElementById('input-school-photo').value = savedPhoto;
-
-            updateAuthStatusUI();
-            applySchoolPhoto(savedPhoto);
-        }
-
-        /**
-         * Navigasi SPA antar 4 halaman utama (home, create, library, play)
-         */
-        function navigateTo(pageName) {
-            document.querySelectorAll('.page-section').forEach(sec => {
-                sec.classList.add('hidden');
-            });
-
-            const targetSection = document.getElementById(`page-${pageName}`);
-            if (targetSection) {
-                targetSection.classList.remove('hidden');
-            }
-
-            if (pageName !== 'play') {
-                window.history.replaceState(null, '', `#${pageName}`);
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-            }
-
-            if (pageName === 'library') {
-                renderLibraryList();
-            }
-        }
-
-        /**
-         * Membaca hash URL saat halaman pertama kali dibuka (termasuk #play=ID)
-         */
-        function handleInitialRoute() {
-            const hash = window.location.hash.replace('#', '');
-            if (hash.startsWith('play=')) {
-                const gameId = hash.split('=')[1];
-                openGameInFullscreen(gameId);
-            } else if (['home', 'create', 'library'].includes(hash)) {
-                navigateTo(hash);
-            } else {
-                navigateTo('home');
-            }
-        }
-
-        /**
-         * Login dengan Akun Google (OAuth 2.0 Standar: Profil & Email)
-         */
-        function handleGoogleLogin() {
-            const clientId = (localStorage.getItem(STORAGE_KEYS.GOOGLE_CLIENT_ID) || DEFAULT_GOOGLE_CLIENT_ID).trim();
-
-            if (!clientId) {
-                showToast('Masukkan Google OAuth Client ID terlebih dahulu di Pengaturan.');
-                openSettingsModal('clientId');
-                return;
-            }
-
-            if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
-                showToast('Layanan Google Sign-In sedang dimuat. Silakan coba sesaat lagi.');
-                return;
-            }
-
-            tokenClient = google.accounts.oauth2.initTokenClient({
-                client_id: clientId,
-                scope: 'openid email profile',
-                callback: async (tokenResponse) => {
-                    if (tokenResponse && tokenResponse.access_token) {
-                        googleAccessToken = tokenResponse.access_token;
-                        await fetchGoogleUserProfile(googleAccessToken);
-                        updateAuthStatusUI();
-                        showToast('Berhasil masuk dengan Akun Google!');
-                    } else {
-                        showToast('Login Google dibatalkan atau gagal.');
-                    }
-                }
-            });
-
-            tokenClient.requestAccessToken({ prompt: 'select_account' });
-        }
-
-        /**
-         * Mengambil nama & foto profil Google guru yang sedang login
-         */
-        async function fetchGoogleUserProfile(accessToken) {
-            try {
-                const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-                    headers: { Authorization: `Bearer ${accessToken}` }
-                });
-                if (res.ok) {
-                    googleUserProfile = await res.json();
-                    const nameEl = document.getElementById('google-user-name');
-                    const avatarEl = document.getElementById('google-user-avatar');
-                    if (googleUserProfile.name) nameEl.textContent = googleUserProfile.name;
-                    if (googleUserProfile.picture) {
-                        avatarEl.src = googleUserProfile.picture;
-                        avatarEl.classList.remove('hidden');
-                    }
-                }
-            } catch (e) {
-                console.warn('Profil Google tidak terbaca:', e);
-            }
-        }
-
-        /**
-         * Logout Akun Google dari sesi aplikasi
-         */
-        function handleGoogleLogout() {
-            if (googleAccessToken && typeof google !== 'undefined') {
-                google.accounts.oauth2.revoke(googleAccessToken, () => {});
-            }
-            googleAccessToken = null;
-            googleUserProfile = null;
-            document.getElementById('google-user-avatar').classList.add('hidden');
-            updateAuthStatusUI();
-            showToast('Berhasil keluar dari akun Google.');
-        }
-
-        /**
-         * Mendapatkan Gemini API Key aktif bawaan sekolah
-         */
-        function getEffectiveApiKey() {
-            if (sharedSchoolApiKey && sharedSchoolApiKey.length > 10) return sharedSchoolApiKey;
-            return DEFAULT_GEMINI_API_KEY;
-        }
-
-        /**
-         * Memperbarui tampilan status login Google / AI di Navbar & Halaman Buat Game
-         */
-        function updateAuthStatusUI() {
-            const btnLogin = document.getElementById('btn-google-login');
-            const profileBox = document.getElementById('google-user-profile');
-            const createBadge = document.getElementById('auth-indicator-create');
-
-            if (googleAccessToken) {
-                btnLogin.classList.add('hidden');
-                profileBox.classList.remove('hidden');
-                profileBox.classList.add('flex');
-            } else {
-                btnLogin.classList.remove('hidden');
-                profileBox.classList.add('hidden');
-                profileBox.classList.remove('flex');
-            }
-
-            if (createBadge) {
-                if (googleAccessToken) {
-                    createBadge.className = 'px-3 py-1.5 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold';
-                    createBadge.textContent = 'Siap Digunakan: Akun Google & Gemini AI Aktif';
-                } else {
-                    createBadge.className = 'px-3 py-1.5 rounded-full bg-blue-100 text-sdBlue-700 text-xs font-bold';
-                    createBadge.textContent = 'Gemini AI Sekolah Siap Digunakan';
-                }
-            }
-        }
-
-        /**
-         * Menyimpan Game ke Firebase (Batas Maksimal 50 Game - Hapus Paling Lama Otomatis)
-         */
-        function getSavedGames() {
-            return cachedGamesList;
-        }
-
-        async function saveCurrentGame() {
-            if (!currentGeneratedCode) {
-                showToast('Generate game terlebih dahulu sebelum menyimpan.');
-                return;
-            }
-
-            const btnSave = document.getElementById('btn-save-game');
-            const originalHtml = btnSave.innerHTML;
-            btnSave.disabled = true;
-            btnSave.innerHTML = '<span>Menyimpan ke Cloud...</span>';
-
-            try {
-                const snapshot = await gamesRef.once('value');
-                const existingData = snapshot.val() || {};
-                const existingEntries = Object.entries(existingData).map(([id, val]) => ({
-                    id,
-                    createdAt: val.createdAt || 0
-                }));
-
-                existingEntries.sort((a, b) => a.createdAt - b.createdAt);
-
-                while (existingEntries.length >= MAX_SAVED_GAMES) {
-                    const oldest = existingEntries.shift();
-                    if (oldest && oldest.id) {
-                        await gamesRef.child(oldest.id).remove();
-                    }
-                }
-
-                const newGameRef = gamesRef.push();
-                const newId = newGameRef.key;
-
-                const gameRecord = {
-                    title: document.getElementById('cfg-title').value.trim() || 'Game Edukasi SD',
-                    grade: document.getElementById('cfg-grade').value,
-                    subject: document.getElementById('cfg-subject').value,
-                    topic: document.getElementById('cfg-topic').value.trim(),
-                    gameType: document.getElementById('cfg-game-type').value,
-                    playerMode: document.getElementById('cfg-player-mode').value,
-                    author: googleUserProfile?.name || 'Guru SDN 150 Barru',
-                    code: currentGeneratedCode,
-                    createdAt: Date.now()
-                };
-
-                await newGameRef.set(gameRecord);
-
-                currentSavedGameId = newId;
-                const actionBtns = document.getElementById('saved-action-buttons');
-                actionBtns.classList.remove('hidden');
-                actionBtns.classList.add('flex');
-
-                showToast('Game berhasil disimpan ke Cloud! (Maks. 50 game)');
-            } catch (error) {
-                console.error('Firebase Save Error:', error);
-                showToast('Gagal menyimpan ke Firebase: ' + error.message);
-            } finally {
-                btnSave.disabled = false;
-                btnSave.innerHTML = originalHtml;
-                lucide.createIcons();
-            }
-        }
-
-        function playSavedGameNow() {
-            if (currentSavedGameId) {
-                openGameInFullscreen(currentSavedGameId);
-            }
-        }
-
-        /**
-         * Membuka Halaman Bermain Layar Penuh (#play=id) langsung dari Firebase
-         */
-        async function openGameInFullscreen(gameId) {
-            let found = cachedGamesList.find(g => g.id === gameId);
-
-            if (!found) {
-                try {
-                    const snap = await gamesRef.child(gameId).once('value');
-                    if (snap.exists()) {
-                        found = { id: gameId, ...snap.val() };
-                    }
-                } catch (e) {
-                    console.error('Fetch single game error:', e);
-                }
-            }
-
-            if (!found) {
-                showToast('Game tidak ditemukan atau sudah terhapus dari daftar.');
-                navigateTo('home');
-                return;
-            }
-
-            document.getElementById('play-page-title').textContent = `${found.title} (${found.grade} - ${found.subject})`;
-            document.getElementById('play-fullscreen-iframe').srcdoc = found.code;
-            window.location.hash = `play=${found.id}`;
-            navigateTo('play');
-        }
-
-        function exitPlayPage() {
-            document.getElementById('play-fullscreen-iframe').srcdoc = '';
-            navigateTo('home');
-        }
-
-        /**
-         * Render Daftar Game Tersimpan (#library)
-         */
-        function renderLibraryList() {
-            const grid = document.getElementById('library-grid');
-            const badge = document.getElementById('library-count-badge');
-            if (!grid || !badge) return;
-
-            if (!isFirebaseLoaded) {
-                badge.textContent = 'Menghubungkan Cloud...';
-                return;
-            }
-
-            let games = [...cachedGamesList];
-            badge.textContent = `${games.length} / ${MAX_SAVED_GAMES} Game Tersimpan`;
-
-            const query = (document.getElementById('lib-search')?.value || '').toLowerCase();
-            const gradeFilter = document.getElementById('lib-filter-grade')?.value || '';
-            const sortBy = document.getElementById('lib-sort')?.value || 'newest';
-
-            games = games.filter(g => {
-                const matchSearch = !query ||
-                    (g.title || '').toLowerCase().includes(query) ||
-                    (g.subject || '').toLowerCase().includes(query) ||
-                    (g.topic || '').toLowerCase().includes(query);
-                const matchGrade = !gradeFilter || (g.grade || '').includes(gradeFilter);
-                return matchSearch && matchGrade;
-            });
-
-            games.sort((a, b) => {
-                if (sortBy === 'title') return (a.title || '').localeCompare(b.title || '');
-                if (sortBy === 'grade') return (a.grade || '').localeCompare(b.grade || '');
-                if (sortBy === 'subject') return (a.subject || '').localeCompare(b.subject || '');
-                if (sortBy === 'topic') return (a.topic || '').localeCompare(b.topic || '');
-                return (b.createdAt || 0) - (a.createdAt || 0);
-            });
-
-            if (games.length === 0) {
-                grid.innerHTML = `
-                    <div class="col-span-full bg-white rounded-3xl p-10 border border-dashed border-slate-300 text-center space-y-3">
-                        <p class="font-display font-extrabold text-lg text-slate-700">Belum ada game yang sesuai</p>
-                        <p class="text-sm text-slate-500">Buat game edukasi pertama Anda di halaman Buat Game Baru.</p>
-                    </div>
-                `;
-                return;
-            }
-
-            grid.innerHTML = games.map(g => `
-                <div class="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-all flex flex-col justify-between gap-4">
-                    <div class="space-y-2">
-                        <div class="flex flex-wrap items-center gap-1.5">
-                            <span class="px-2.5 py-0.5 rounded-full bg-blue-100 text-sdBlue-700 text-xs font-bold">${escapeHtml(g.grade)}</span>
-                            <span class="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-xs font-bold">${escapeHtml(g.subject)}</span>
-                        </div>
-                        <h3 class="font-display font-extrabold text-lg text-slate-800 leading-snug">${escapeHtml(g.title)}</h3>
-                        <p class="text-xs text-slate-600 line-clamp-2"><strong>Materi:</strong> ${escapeHtml(g.topic)}</p>
-                        <p class="text-[11px] text-slate-400">${escapeHtml(g.gameType)} • ${escapeHtml(g.playerMode)}</p>
-                    </div>
-                    <div class="pt-3 border-t border-slate-100 flex items-center gap-2">
-                        <button onclick="openGameInFullscreen('${g.id}')" class="flex-grow inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-sdBlue-600 hover:bg-sdBlue-700 text-white font-bold text-xs transition-all">
-                            <i data-lucide="play" class="w-3.5 h-3.5"></i>
-                            <span>Mainkan</span>
-                        </button>
-                        <button onclick="openShareModal('${g.id}')" class="inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-all" title="Bagikan">
-                            <i data-lucide="share-2" class="w-3.5 h-3.5"></i>
-                        </button>
-                        <button onclick="deleteSavedGame('${g.id}')" class="inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 font-bold text-xs transition-all" title="Hapus Game">
-                            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                        </button>
-                    </div>
-                </div>
-            `).join('');
-
-            lucide.createIcons();
-        }
-
-        async function deleteSavedGame(gameId) {
-            try {
-                await gamesRef.child(gameId).remove();
-                showToast('Game berhasil dihapus dari Cloud.');
-            } catch (error) {
-                showToast('Gagal menghapus game: ' + error.message);
-            }
-        }
-
-        /**
-         * Fungsi Pemanggil Gemini API menggunakan API Key Bawaan Sekolah (dengan fallback model otomatis)
+         * Fungsi Pemanggil Gemini API menggunakan API Key Bawaan Sekolah (Cepat & Anti-Hang)
          */
         async function callGeminiModel(promptText) {
             const apiKey = getEffectiveApiKey();
@@ -1148,13 +749,19 @@
             for (const modelName of candidateModels) {
                 const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
+                activeAbortController = new AbortController();
+                const timeoutId = setTimeout(() => {
+                    if (activeAbortController) activeAbortController.abort();
+                }, 45000); // Batas maksimal 45 detik per percobaan
+
                 const payload = {
                     contents: [{
                         parts: [{ text: promptText }]
                     }],
                     generationConfig: {
                         temperature: 0.7,
-                        maxOutputTokens: 8192
+                        maxOutputTokens: 8192,
+                        thinkingConfig: { thinkingBudget: 0 }
                     }
                 };
 
@@ -1162,14 +769,16 @@
                     const response = await fetch(url, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
+                        body: JSON.stringify(payload),
+                        signal: activeAbortController.signal
                     });
 
+                    clearTimeout(timeoutId);
                     const data = await response.json();
 
                     if (!response.ok) {
                         lastErrorMessage = data?.error?.message || `Error API (${response.status})`;
-                        if (lastErrorMessage.includes('no longer available') || lastErrorMessage.includes('not found')) {
+                        if (lastErrorMessage.includes('no longer available') || lastErrorMessage.includes('not found') || lastErrorMessage.includes('thinking')) {
                             continue;
                         }
                         throw new Error(lastErrorMessage);
@@ -1187,14 +796,28 @@
                         .replace(/```\s*$/i, '')
                         .trim();
                 } catch (err) {
+                    clearTimeout(timeoutId);
+                    if (err.name === 'AbortError') {
+                        throw new Error('Proses dibatalkan atau waktu tunggu habis (lebih dari 45 detik). Silakan klik Generate lagi.');
+                    }
                     lastErrorMessage = err.message || lastErrorMessage;
                     if (!lastErrorMessage.includes('no longer available') && !lastErrorMessage.includes('not found')) {
                         throw err;
                     }
+                } finally {
+                    activeAbortController = null;
                 }
             }
 
             throw new Error(lastErrorMessage);
+        }
+
+        function cancelActiveGeneration() {
+            if (activeAbortController) {
+                activeAbortController.abort();
+            }
+            setPreviewLoadingState(false);
+            showToast('Proses pembuatan game dibatalkan.');
         }
 
         /**
@@ -1319,11 +942,24 @@ Keluarkan HANYA kode HTML tunggal lengkap dari <!DOCTYPE html> sampai </html> ta
         function setPreviewLoadingState(isLoading, subtext = '') {
             const loadingEl = document.getElementById('preview-loading-state');
             const emptyEl = document.getElementById('preview-empty-state');
+            const timerEl = document.getElementById('loading-timer-text');
             const btnGen = document.getElementById('btn-generate-game');
             const btnRev = document.getElementById('btn-revise-game');
 
+            if (loadingIntervalId) {
+                clearInterval(loadingIntervalId);
+                loadingIntervalId = null;
+            }
+
             if (isLoading) {
                 if (subtext) document.getElementById('loading-subtext').textContent = subtext;
+                let seconds = 0;
+                if (timerEl) timerEl.textContent = 'Waktu berjalan: 0 detik';
+                loadingIntervalId = setInterval(() => {
+                    seconds++;
+                    if (timerEl) timerEl.textContent = `Waktu berjalan: ${seconds} detik`;
+                }, 1000);
+
                 loadingEl.classList.remove('hidden');
                 emptyEl.classList.add('hidden');
                 if (btnGen) btnGen.disabled = true;
