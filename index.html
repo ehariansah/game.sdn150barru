@@ -1,0 +1,1473 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generator Game Edukasi Digital - SDN 150 Barru</title>
+    
+    <!-- Google Fonts: Plus Jakarta Sans & Nunito (Ramah anak SD & modern) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Lucide Icons via CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Google Identity Services (OAuth 2.0 untuk Login Akun Google) -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+    <!-- Firebase Realtime Database SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+
+    <!-- Konfigurasi Tema & Font Tailwind -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+                        display: ['"Nunito"', 'sans-serif'],
+                    },
+                    colors: {
+                        sdBlue: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            500: '#2563eb',
+                            600: '#1d4ed8',
+                            700: '#1e40af',
+                        },
+                        sdYellow: {
+                            300: '#fde047',
+                            400: '#facc15',
+                            500: '#eab308',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col selection:bg-sdYellow-300 selection:text-sdBlue-700">
+
+    <!-- ==================== NAVBAR ATAS ==================== -->
+    <header class="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-blue-100 shadow-sm">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between">
+            <!-- Logo & Nama Sekolah -->
+            <button onclick="navigateTo('home')" class="flex items-center gap-3 text-left group focus:outline-none">
+                <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-br from-sdBlue-500 to-sdBlue-700 flex items-center justify-center text-white shadow-md shadow-blue-500/20 group-hover:scale-105 transition-transform">
+                    <i data-lucide="graduation-cap" class="w-6 h-6 sm:w-7 sm:h-7 text-sdYellow-300"></i>
+                </div>
+                <div>
+                    <span class="block font-display font-extrabold text-base sm:text-lg text-sdBlue-700 leading-tight">
+                        SDN 150 Barru
+                    </span>
+                    <span class="block text-xs font-medium text-slate-500">
+                        Portal Game Edukasi AI
+                    </span>
+                </div>
+            </button>
+
+            <!-- Status API & Tombol Pengaturan -->
+            <div class="flex items-center gap-2 sm:gap-3">
+                <!-- Tombol Login Akun Google (OAuth 2.0) -->
+                <button id="btn-google-login" onclick="handleGoogleLogin()" class="flex items-center gap-2 px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl bg-white hover:bg-blue-50 text-slate-700 hover:text-sdBlue-700 font-bold text-xs sm:text-sm border border-slate-300 hover:border-sdBlue-300 shadow-sm transition-all">
+                    <!-- Ikon Google SVG -->
+                    <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                        <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17Z"/>
+                        <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.11-6.72-4.96H1.29v3.14C3.26 21.3 7.31 24 12 24Z"/>
+                        <path fill="#FBBC05" d="M5.28 14.24c-.24-.72-.38-1.49-.38-2.24s.14-1.52.38-2.24V6.62H1.29C.47 8.24 0 10.06 0 12s.47 3.76 1.29 5.38l3.99-3.14Z"/>
+                        <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.7 1.29 6.62l3.99 3.14c.95-2.85 3.6-4.96 6.72-4.96Z"/>
+                    </svg>
+                    <span id="google-login-label">Masuk dengan Google</span>
+                </button>
+
+                <!-- Profil Guru Terhubung (Tampil setelah Login Google) -->
+                <div id="google-user-profile" class="hidden items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold">
+                    <img id="google-user-avatar" src="" alt="Profil" class="w-6 h-6 rounded-full border border-emerald-300 hidden" />
+                    <span id="google-user-name" class="max-w-[110px] truncate">Akun Terhubung</span>
+                    <button onclick="handleGoogleLogout()" class="ml-1 text-slate-400 hover:text-red-600" title="Keluar Akun Google">
+                        <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
+                    </button>
+                </div>
+
+                <!-- Tombol Pengaturan -->
+                <button onclick="openSettingsModal()" class="flex items-center gap-2 px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-sdBlue-600 font-semibold text-sm border border-slate-200 hover:border-blue-200 transition-all shadow-sm" title="Pengaturan Google Client ID, API Key & Foto Sekolah">
+                    <i data-lucide="settings" class="w-4 h-4 sm:w-5 sm:h-5"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- ==================== KONTEN UTAMA SPA ==================== -->
+    <main class="flex-grow">
+
+        <!-- ========================================================= -->
+        <!-- HALAMAN 1: BERANDA (#home)                                -->
+        <!-- ========================================================= -->
+        <section id="page-home" class="page-section max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+            <!-- Kartu Hero Utama -->
+            <div class="bg-white rounded-3xl shadow-xl shadow-blue-900/5 border border-blue-100 overflow-hidden">
+                <div class="grid grid-cols-1 lg:grid-cols-12 items-center">
+                    
+                    <!-- Kolom Kiri: Judul, Deskripsi & 2 Tombol Utama -->
+                    <div class="lg:col-span-7 p-6 sm:p-10 lg:p-12 space-y-6">
+                        <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-50 border border-blue-200 text-sdBlue-700 text-xs sm:text-sm font-bold">
+                            <i data-lucide="sparkles" class="w-4 h-4 text-sdYellow-500"></i>
+                            <span>Media Pembelajaran Interaktif Berbasis AI</span>
+                        </div>
+
+                        <h1 class="font-display font-black text-3xl sm:text-4xl lg:text-5xl text-slate-900 leading-tight">
+                            Generator Game Edukasi Digital <span class="text-sdBlue-600">UPTD SDN 150 Barru</span>
+                        </h1>
+
+                        <p class="text-slate-600 text-base sm:text-lg leading-relaxed">
+                            Rancang game pembelajaran interaktif yang seru dan sesuai kurikulum Sekolah Dasar hanya dalam hitungan detik. Dukung kreativitas Bapak/Ibu Guru untuk pembelajaran yang lebih menyenangkan bagi siswa!
+                        </p>
+
+                        <!-- 2 Tombol Utama Halaman Beranda -->
+                        <div class="flex flex-col sm:flex-row gap-4 pt-2">
+                            <!-- Tombol 1: Buat Game -->
+                            <button onclick="navigateTo('create')" class="flex items-center justify-center gap-3 px-7 py-4 rounded-2xl bg-gradient-to-r from-sdBlue-600 to-sdBlue-500 hover:from-sdBlue-700 hover:to-sdBlue-600 text-white font-display font-extrabold text-base sm:text-lg shadow-lg shadow-blue-500/30 hover:shadow-xl hover:-translate-y-0.5 transition-all">
+                                <i data-lucide="wand-2" class="w-6 h-6 text-sdYellow-300"></i>
+                                <span>Buat Game Baru</span>
+                            </button>
+
+                            <!-- Tombol 2: Daftar Game yang Sudah Dibuat -->
+                            <button onclick="navigateTo('library')" class="flex items-center justify-center gap-3 px-7 py-4 rounded-2xl bg-sdYellow-400 hover:bg-sdYellow-300 text-slate-900 font-display font-extrabold text-base sm:text-lg shadow-lg shadow-yellow-500/20 hover:shadow-xl hover:-translate-y-0.5 transition-all">
+                                <i data-lucide="library" class="w-6 h-6 text-sdBlue-700"></i>
+                                <span>Daftar Game Tersimpan</span>
+                            </button>
+                        </div>
+
+                        <!-- Info Singkat Fitur -->
+                        <div class="pt-4 border-t border-slate-100 grid grid-cols-3 gap-4 text-center sm:text-left">
+                            <div>
+                                <p class="font-display font-extrabold text-lg sm:text-xl text-sdBlue-600">Kelas 1–6</p>
+                                <p class="text-xs text-slate-500 font-medium">Semua Mapel SD</p>
+                            </div>
+                            <div>
+                                <p class="font-display font-extrabold text-lg sm:text-xl text-sdBlue-600">Otomatis AI</p>
+                                <p class="text-xs text-slate-500 font-medium">Cepat & Interaktif</p>
+                            </div>
+                            <div>
+                                <p class="font-display font-extrabold text-lg sm:text-xl text-sdBlue-600">Siap Bagikan</p>
+                                <p class="text-xs text-slate-500 font-medium">Tautan & Kode HTML</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Kolom Kanan: Gambar Sekolah SDN 150 Barru -->
+                    <div class="lg:col-span-5 bg-gradient-to-br from-blue-600 via-sdBlue-700 to-indigo-900 p-6 sm:p-10 h-full flex flex-col justify-center items-center relative overflow-hidden">
+                        <div class="absolute -top-12 -right-12 w-48 h-48 rounded-full bg-white/10 blur-xl"></div>
+                        <div class="absolute -bottom-12 -left-12 w-48 h-48 rounded-full bg-sdYellow-400/20 blur-xl"></div>
+
+                        <!-- Bingkai Gambar Sekolah -->
+                        <div class="relative w-full max-w-md rounded-2xl overflow-hidden shadow-2xl border-4 border-white/20 bg-white/10 backdrop-blur-sm">
+                            <img id="school-hero-image" 
+                                 src="" 
+                                 alt="Gedung UPTD SDN 150 Barru" 
+                                 class="w-full h-64 sm:h-72 object-cover hidden"
+                                 onerror="handleSchoolImageError()" />
+
+                            <!-- Ilustrasi SVG Gedung Sekolah Dasar Bawaan -->
+                            <div id="school-fallback-illustration" class="w-full h-64 sm:h-72 bg-gradient-to-b from-sky-300 via-sky-200 to-emerald-100 flex flex-col items-center justify-end relative p-4 select-none">
+                                <div class="absolute top-5 right-6 w-12 h-12 rounded-full bg-yellow-300 shadow-lg shadow-yellow-300/60"></div>
+                                <div class="absolute top-6 left-8 w-16 h-5 rounded-full bg-white/80"></div>
+                                <div class="absolute top-10 left-14 w-12 h-4 rounded-full bg-white/70"></div>
+
+                                <svg viewBox="0 0 360 180" class="w-full h-48 drop-shadow-md">
+                                    <rect x="0" y="155" width="360" height="25" fill="#4ade80" rx="4"/>
+                                    <rect x="155" y="155" width="50" height="25" fill="#cbd5e1"/>
+                                    <rect x="45" y="75" width="270" height="80" fill="#fffbeb" stroke="#e2e8f0" stroke-width="2" rx="4"/>
+                                    <polygon points="35,75 180,25 325,75" fill="#dc2626"/>
+                                    <polygon points="125,75 180,35 235,75" fill="#b91c1c"/>
+                                    <rect x="135" y="55" width="90" height="16" rx="4" fill="#1e40af"/>
+                                    <text x="180" y="66" font-family="Nunito, sans-serif" font-size="9" font-weight="800" fill="#fde047" text-anchor="middle">SDN 150 BARRU</text>
+                                    <rect x="163" y="108" width="34" height="47" fill="#92400e" rx="3"/>
+                                    <line x1="180" y1="108" x2="180" y2="155" stroke="#78350f" stroke-width="2"/>
+                                    <rect x="65" y="95" width="26" height="28" fill="#38bdf8" stroke="#1e40af" stroke-width="2" rx="2"/>
+                                    <rect x="103" y="95" width="26" height="28" fill="#38bdf8" stroke="#1e40af" stroke-width="2" rx="2"/>
+                                    <rect x="231" y="95" width="26" height="28" fill="#38bdf8" stroke="#1e40af" stroke-width="2" rx="2"/>
+                                    <rect x="269" y="95" width="26" height="28" fill="#38bdf8" stroke="#1e40af" stroke-width="2" rx="2"/>
+                                    <line x1="25" y1="50" x2="25" y2="155" stroke="#475569" stroke-width="3"/>
+                                    <rect x="26.5" y="52" width="26" height="9" fill="#ef4444"/>
+                                    <rect x="26.5" y="61" width="26" height="9" fill="#ffffff"/>
+                                </svg>
+                            </div>
+
+                            <!-- Label Keterangan Foto Sekolah -->
+                            <div class="bg-slate-900/75 backdrop-blur-md px-4 py-3 flex items-center justify-between text-white">
+                                <div>
+                                    <p class="font-display font-bold text-sm">UPTD SDN 150 Barru</p>
+                                    <p class="text-xs text-blue-200">Kabupaten Barru, Sulawesi Selatan</p>
+                                </div>
+                                <button onclick="openSettingsModal('photo')" class="text-xs bg-white/15 hover:bg-white/25 px-3 py-1.5 rounded-lg font-semibold transition-colors">
+                                    Ganti Foto Sekolah
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Kartu Panduan Singkat 3 Langkah -->
+            <div class="mt-8 grid grid-cols-1 md:grid-cols-3 gap-5">
+                <div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm flex items-start gap-4">
+                    <div class="w-11 h-11 rounded-xl bg-blue-100 text-sdBlue-600 flex items-center justify-center shrink-0 font-display font-black text-lg">1</div>
+                    <div>
+                        <h3 class="font-display font-extrabold text-slate-800 text-base">Masuk Akun Google</h3>
+                        <p class="text-sm text-slate-600 mt-1">Klik tombol Masuk dengan Google di kanan atas agar terhubung ke Gemini AI.</p>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm flex items-start gap-4">
+                    <div class="w-11 h-11 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0 font-display font-black text-lg">2</div>
+                    <div>
+                        <h3 class="font-display font-extrabold text-slate-800 text-base">Atur Materi & Jenis Game</h3>
+                        <p class="text-sm text-slate-600 mt-1">Pilih kelas, mata pelajaran, topik materi, mode pemain, dan uji coba langsung hasilnya.</p>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm flex items-start gap-4">
+                    <div class="w-11 h-11 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0 font-display font-black text-lg">3</div>
+                    <div>
+                        <h3 class="font-display font-extrabold text-slate-800 text-base">Simpan & Bagikan</h3>
+                        <p class="text-sm text-slate-600 mt-1">Simpan ke daftar sekolah dan bagikan tautannya ke grup kelas siswa dengan mudah.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================================= -->
+        <!-- HALAMAN 2: PEMBUATAN GAME (#create)                       -->
+        <!-- ========================================================= -->
+        <section id="page-create" class="page-section hidden max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+            <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+                <button onclick="navigateTo('home')" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 font-bold text-sm border border-slate-200 shadow-sm transition-all">
+                    <i data-lucide="arrow-left" class="w-4 h-4"></i>
+                    <span>Kembali ke Beranda</span>
+                </button>
+                <div class="flex items-center gap-2">
+                    <span id="auth-indicator-create" class="px-3 py-1.5 rounded-full bg-amber-100 text-amber-800 text-xs font-bold">
+                        Belum Login Google
+                    </span>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-start">
+                
+                <!-- KOLOM KIRI: FORMULIR PENGATURAN GAME LENGKAP -->
+                <div class="lg:col-span-5 bg-white rounded-3xl p-5 sm:p-7 border border-blue-100 shadow-md space-y-5">
+                    <div class="flex items-center gap-3 pb-3 border-b border-slate-100">
+                        <div class="w-10 h-10 rounded-2xl bg-blue-100 text-sdBlue-600 flex items-center justify-center">
+                            <i data-lucide="sliders-horizontal" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <h2 class="font-display font-extrabold text-lg sm:text-xl text-slate-800">Pengaturan Game Edukasi</h2>
+                            <p class="text-xs text-slate-500">Sesuaikan materi & mode bermain untuk siswa</p>
+                        </div>
+                    </div>
+
+                    <form id="game-generator-form" onsubmit="generateEduGame(event)" class="space-y-4">
+                        <!-- Judul Game -->
+                        <div>
+                            <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">Judul Game *</label>
+                            <input type="text" id="cfg-title" required placeholder="Contoh: Petualangan Pecahan Kelas 4"
+                                   class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:border-sdBlue-500 focus:ring-2 focus:ring-blue-200 text-sm outline-none" />
+                        </div>
+
+                        <!-- Baris Kelas & Mata Pelajaran -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">Jenjang Kelas *</label>
+                                <select id="cfg-grade" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:border-sdBlue-500 text-sm bg-white outline-none">
+                                    <option value="Kelas 1 SD (Fase A)">Kelas 1 SD (Fase A)</option>
+                                    <option value="Kelas 2 SD (Fase A)">Kelas 2 SD (Fase A)</option>
+                                    <option value="Kelas 3 SD (Fase B)">Kelas 3 SD (Fase B)</option>
+                                    <option value="Kelas 4 SD (Fase B)" selected>Kelas 4 SD (Fase B)</option>
+                                    <option value="Kelas 5 SD (Fase C)">Kelas 5 SD (Fase C)</option>
+                                    <option value="Kelas 6 SD (Fase C)">Kelas 6 SD (Fase C)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">Mata Pelajaran *</label>
+                                <select id="cfg-subject" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:border-sdBlue-500 text-sm bg-white outline-none">
+                                    <option value="Matematika">Matematika</option>
+                                    <option value="Bahasa Indonesia">Bahasa Indonesia</option>
+                                    <option value="IPAS (Ilmu Pengetahuan Alam & Sosial)">IPAS</option>
+                                    <option value="Pendidikan Pancasila">Pendidikan Pancasila</option>
+                                    <option value="Pendidikan Agama Islam & Budi Pekerti">Pendidikan Agama Islam</option>
+                                    <option value="PJOK">PJOK</option>
+                                    <option value="Seni Budaya & Prakarya (SBdP)">Seni Budaya (SBdP)</option>
+                                    <option value="Bahasa Inggris">Bahasa Inggris</option>
+                                    <option value="Mulok Bahasa Daerah Bugis">Mulok Bahasa Bugis</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Topik / Materi -->
+                        <div>
+                            <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">Topik / Materi Pembelajaran *</label>
+                            <textarea id="cfg-topic" rows="2" required placeholder="Contoh: Operasi penjumlahan pecahan berpenyebut sama dan soal cerita kehidupan sehari-hari"
+                                      class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:border-sdBlue-500 focus:ring-2 focus:ring-blue-200 text-sm outline-none"></textarea>
+                        </div>
+
+                        <!-- Jenis Game & Mode Pemain -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">Jenis Permainan</label>
+                                <select id="cfg-game-type" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:border-sdBlue-500 text-sm bg-white outline-none">
+                                    <option value="Kuis Petualangan Pilihan Ganda">Kuis Petualangan</option>
+                                    <option value="Tarik Tambang / Balapan Cerdas Cermat">Tarik Tambang / Balapan</option>
+                                    <option value="Mencocokkan Kartu (Memory / Matching Card)">Mencocokkan Kartu</option>
+                                    <option value="Susun Kata / Tebak Kata">Susun & Tebak Kata</option>
+                                    <option value="Kelompokkan Benda (Klik & Pilih Kategori)">Kelompokkan Kategori</option>
+                                    <option value="Tangkap Jawaban Benar (Arcade)">Tangkap Jawaban Benar</option>
+                                    <option value="Benar atau Salah Cepat">Benar / Salah Cepat</option>
+                                    <option value="Ular Tangga Edukasi">Ular Tangga Edukasi</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">Mode Pemain</label>
+                                <select id="cfg-player-mode" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:border-sdBlue-500 text-sm bg-white outline-none">
+                                    <option value="Single Player (1 Pemain Mandiri)">Single Player (1 Pemain)</option>
+                                    <option value="Duel 2 Pemain Layar Terbagi (Split Screen 1 Perangkat)">Duel 2 Pemain (1 Layar)</option>
+                                    <option value="Beregu / Kelompok (Tim Merah vs Tim Biru)">Beregu (Tim Merah vs Biru)</option>
+                                    <option value="Multiplayer Bergiliran (2-4 Siswa di 1 Perangkat)">Banyak Pemain Bergiliran (2-4 Siswa)</option>
+                                    <option value="Mode Klasikal LCD Proyektor (Dipandu Guru di Kelas)">Mode Klasikal LCD Kelas</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Jumlah Soal, Kesulitan, Tema Visual -->
+                        <div class="grid grid-cols-3 gap-2.5">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-600 mb-1">Jumlah Soal</label>
+                                <select id="cfg-count" class="w-full px-2.5 py-2 rounded-xl border border-slate-300 text-xs sm:text-sm bg-white outline-none">
+                                    <option value="5">5 Soal</option>
+                                    <option value="8">8 Soal</option>
+                                    <option value="10" selected>10 Soal</option>
+                                    <option value="15">15 Soal</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-600 mb-1">Kesulitan</label>
+                                <select id="cfg-difficulty" class="w-full px-2.5 py-2 rounded-xl border border-slate-300 text-xs sm:text-sm bg-white outline-none">
+                                    <option value="Mudah (Dasar)">Mudah</option>
+                                    <option value="Sedang (Standar)" selected>Sedang</option>
+                                    <option value="HOTS (Tantangan)">HOTS</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-600 mb-1">Waktu</label>
+                                <select id="cfg-timer" class="w-full px-2.5 py-2 rounded-xl border border-slate-300 text-xs sm:text-sm bg-white outline-none">
+                                    <option value="Tanpa batas waktu">Santai</option>
+                                    <option value="15 detik per soal">15 dtk/soal</option>
+                                    <option value="30 detik per soal" selected>30 dtk/soal</option>
+                                    <option value="Total 3 menit">Total 3 mnt</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Tema Visual & Suara -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-600 mb-1">Tema Visual Anak</label>
+                                <select id="cfg-theme" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs sm:text-sm bg-white outline-none">
+                                    <option value="Petualangan Hutan & Alam Ceria">Alam & Hutan Ceria</option>
+                                    <option value="Luar Angkasa & Roket">Luar Angkasa & Roket</option>
+                                    <option value="Bawah Laut & Terumbu Karang">Bawah Laut</option>
+                                    <option value="Suasana Sekolah & Papan Tulis">Suasana Sekolah</option>
+                                    <option value="Budaya Sulawesi Selatan & Kapal Pinisi">Budaya & Kapal Pinisi</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-600 mb-1">Efek Suara</label>
+                                <select id="cfg-sound" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs sm:text-sm bg-white outline-none">
+                                    <option value="Aktifkan efek suara ceria menggunakan Web Audio API">Efek Suara Aktif</option>
+                                    <option value="Tanpa suara (Hening)">Tanpa Suara</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Kotak Prompt Tambahan Sebelum Generate -->
+                        <div>
+                            <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
+                                Instruksi / Prompt Tambahan <span class="font-normal text-slate-400">(Opsional)</span>
+                            </label>
+                            <textarea id="cfg-extra-prompt" rows="2" placeholder="Contoh: Gunakan nama tokoh anak-anak khas Bugis seperti Andi dan Besse, berikan penjelasan singkat setiap jawaban salah..."
+                                      class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:border-sdBlue-500 focus:ring-2 focus:ring-blue-200 text-sm outline-none"></textarea>
+                        </div>
+
+                        <!-- Tombol Generate Utama -->
+                        <button type="submit" id="btn-generate-game" class="w-full flex items-center justify-center gap-2.5 py-3.5 px-6 rounded-2xl bg-gradient-to-r from-sdBlue-600 to-sdBlue-500 hover:from-sdBlue-700 hover:to-sdBlue-600 text-white font-display font-extrabold text-base shadow-lg shadow-blue-500/25 transition-all">
+                            <i data-lucide="sparkles" class="w-5 h-5 text-sdYellow-300"></i>
+                            <span>Generate Game Sekarang</span>
+                        </button>
+                    </form>
+                </div>
+
+                <!-- KOLOM KANAN: JENDELA UJI COBA, REVISI & SIMPAN -->
+                <div class="lg:col-span-7 space-y-5">
+                    <!-- Bingkai Jendela Uji Coba Game -->
+                    <div class="bg-white rounded-3xl p-4 sm:p-5 border border-blue-100 shadow-md">
+                        <div class="flex items-center justify-between mb-3 px-1">
+                            <div class="flex items-center gap-2">
+                                <span class="w-3 h-3 rounded-full bg-red-400"></span>
+                                <span class="w-3 h-3 rounded-full bg-amber-400"></span>
+                                <span class="w-3 h-3 rounded-full bg-emerald-400"></span>
+                                <span class="ml-2 font-display font-extrabold text-sm text-slate-700">Jendela Uji Coba Langsung</span>
+                            </div>
+                            <button type="button" onclick="reloadPreviewIframe()" id="btn-reload-preview" class="hidden text-xs font-bold text-sdBlue-600 hover:underline flex items-center gap-1">
+                                <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+                                <span>Muat Ulang Game</span>
+                            </button>
+                        </div>
+
+                        <!-- Kontainer Iframe Game -->
+                        <div class="relative w-full h-[430px] sm:h-[500px] rounded-2xl overflow-hidden bg-slate-100 border border-slate-200">
+                            <!-- State Kosong Awal -->
+                            <div id="preview-empty-state" class="absolute inset-0 flex flex-col items-center justify-center p-6 text-center">
+                                <div class="w-16 h-16 rounded-2xl bg-blue-100 text-sdBlue-600 flex items-center justify-center mb-3">
+                                    <i data-lucide="gamepad-2" class="w-8 h-8"></i>
+                                </div>
+                                <h3 class="font-display font-extrabold text-lg text-slate-700">Belum Ada Game Dibuat</h3>
+                                <p class="text-xs sm:text-sm text-slate-500 max-w-md mt-1">
+                                    Pastikan sudah <strong>Masuk dengan Google</strong>, isi pengaturan pelajaran di sebelah kiri, lalu klik <strong>Generate Game Sekarang</strong>.
+                                </p>
+                            </div>
+
+                            <!-- Loading Overlay saat AI Merakit Game -->
+                            <div id="preview-loading-state" class="hidden absolute inset-0 z-20 bg-white/95 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center">
+                                <div class="w-14 h-14 border-4 border-blue-200 border-t-sdBlue-600 rounded-full animate-spin mb-4"></div>
+                                <h3 class="font-display font-extrabold text-lg text-sdBlue-700">Gemini AI Sedang Merakit Game...</h3>
+                                <p id="loading-subtext" class="text-xs sm:text-sm text-slate-500 max-w-sm mt-1">
+                                    Menyusun soal, logika permainan, dan tampilan ramah anak SD. Mohon tunggu sekitar 10–20 detik.
+                                </p>
+                            </div>
+
+                            <!-- Iframe Tempat Game Berjalan -->
+                            <iframe id="game-preview-iframe" class="hidden w-full h-full border-0 bg-white" sandbox="allow-scripts allow-same-origin"></iframe>
+                        </div>
+                    </div>
+
+                    <!-- KOTAK REVISI & TOMBOL AKSI (Tampil setelah game di-generate) -->
+                    <div id="post-generate-panel" class="hidden bg-white rounded-3xl p-5 sm:p-6 border border-blue-100 shadow-md space-y-4">
+                        <!-- Form Revisi Iteratif -->
+                        <div>
+                            <label for="revision-prompt-input" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                                Kotak Revisi Game (Perbaiki atau Tambah Fitur)
+                            </label>
+                            <div class="flex flex-col sm:flex-row gap-2.5">
+                                <input type="text" id="revision-prompt-input" placeholder="Contoh: Perbesar ukuran huruf soal, ubah warna tombol jadi lebih cerah, atau perbaiki skor..."
+                                       class="flex-grow px-4 py-2.5 rounded-xl border border-slate-300 focus:border-sdBlue-500 focus:ring-2 focus:ring-blue-200 text-sm outline-none" />
+                                <button type="button" onclick="reviseEduGame()" id="btn-revise-game" class="shrink-0 inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-sm shadow-sm transition-all">
+                                    <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                                    <span>Generate Ulang</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Baris Tombol Simpan -> Munculkan Mainkan & Bagikan -->
+                        <div class="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
+                            <button type="button" onclick="saveCurrentGame()" id="btn-save-game" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-display font-extrabold text-sm shadow-md shadow-emerald-500/20 transition-all">
+                                <i data-lucide="save" class="w-4 h-4"></i>
+                                <span>Simpan Game</span>
+                            </button>
+
+                            <!-- Muncul setelah tombol Simpan diklik -->
+                            <div id="saved-action-buttons" class="hidden flex flex-wrap items-center gap-2.5">
+                                <button type="button" onclick="playSavedGameNow()" class="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-sdBlue-600 hover:bg-sdBlue-700 text-white font-display font-extrabold text-sm shadow-md transition-all">
+                                    <i data-lucide="play" class="w-4 h-4"></i>
+                                    <span>Mainkan</span>
+                                </button>
+                                <button type="button" onclick="openShareModal(currentSavedGameId)" class="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-display font-extrabold text-sm shadow-md transition-all">
+                                    <i data-lucide="share-2" class="w-4 h-4"></i>
+                                    <span>Bagikan</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ========================================================= -->
+        <!-- HALAMAN 3: DAFTAR GAME TERSIMPAN (#library)               -->
+        <!-- ========================================================= -->
+        <section id="page-library" class="page-section hidden max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+                <button onclick="navigateTo('home')" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 font-bold text-sm border border-slate-200 shadow-sm transition-all">
+                    <i data-lucide="arrow-left" class="w-4 h-4"></i>
+                    <span>Kembali ke Beranda</span>
+                </button>
+                <div class="flex items-center gap-2">
+                    <span id="library-count-badge" class="px-3.5 py-1.5 rounded-full bg-amber-100 text-amber-800 text-xs font-extrabold">
+                        Memuat dari Cloud...
+                    </span>
+                </div>
+            </div>
+
+            <!-- Bar Pencarian & Pengurutan -->
+            <div class="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200 shadow-sm mb-6 grid grid-cols-1 md:grid-cols-12 gap-3">
+                <div class="md:col-span-6 relative">
+                    <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+                    <input type="text" id="lib-search" oninput="renderLibraryList()" placeholder="Cari nama game, materi, atau mapel..."
+                           class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 focus:border-sdBlue-500 text-sm outline-none" />
+                </div>
+                <div class="md:col-span-3">
+                    <select id="lib-filter-grade" onchange="renderLibraryList()" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm bg-white outline-none">
+                        <option value="">Semua Kelas</option>
+                        <option value="Kelas 1">Kelas 1 SD</option>
+                        <option value="Kelas 2">Kelas 2 SD</option>
+                        <option value="Kelas 3">Kelas 3 SD</option>
+                        <option value="Kelas 4">Kelas 4 SD</option>
+                        <option value="Kelas 5">Kelas 5 SD</option>
+                        <option value="Kelas 6">Kelas 6 SD</option>
+                    </select>
+                </div>
+                <div class="md:col-span-3">
+                    <select id="lib-sort" onchange="renderLibraryList()" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm bg-white outline-none">
+                        <option value="newest">Urutkan: Terbaru</option>
+                        <option value="title">Urutkan: Nama Game (A-Z)</option>
+                        <option value="grade">Urutkan: Kelas</option>
+                        <option value="subject">Urutkan: Mata Pelajaran</option>
+                        <option value="topic">Urutkan: Materi</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Daftar Kartu Game -->
+            <div id="library-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                <div class="col-span-full bg-white rounded-3xl p-10 border border-slate-200 text-center space-y-2">
+                    <div class="w-10 h-10 border-4 border-blue-200 border-t-sdBlue-600 rounded-full animate-spin mx-auto"></div>
+                    <p class="font-display font-bold text-slate-600">Menghubungkan ke database sekolah...</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================================= -->
+        <!-- HALAMAN 4: HALAMAN BERMAIN FULLSCREEN (#play)              -->
+        <!-- ========================================================= -->
+        <section id="page-play" class="page-section hidden fixed inset-0 z-50 bg-slate-900 flex flex-col">
+            <!-- Bar Atas Minimalis Halaman Bermain -->
+            <div class="bg-slate-900/95 text-white px-4 py-2.5 flex items-center justify-between border-b border-slate-800">
+                <div class="flex items-center gap-2.5 truncate">
+                    <span class="px-2.5 py-1 rounded-lg bg-sdBlue-600 text-xs font-bold shrink-0">SDN 150 Barru</span>
+                    <h2 id="play-page-title" class="font-display font-bold text-sm sm:text-base truncate">Memuat Game...</h2>
+                </div>
+                <button onclick="exitPlayPage()" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs sm:text-sm transition-all shrink-0">
+                    <i data-lucide="x-circle" class="w-4 h-4"></i>
+                    <span>Keluar / Beranda</span>
+                </button>
+            </div>
+            <!-- Area Permainan Layar Penuh -->
+            <iframe id="play-fullscreen-iframe" class="w-full flex-grow border-0 bg-white" sandbox="allow-scripts allow-same-origin"></iframe>
+        </section>
+
+    </main>
+    <!-- ==================== MODAL PENGATURAN (GOOGLE OAUTH, API KEY & FOTO SEKOLAH) ==================== -->
+    <div id="settings-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 overflow-y-auto">
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl border border-slate-100 transform transition-all my-auto">
+            <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-9 h-9 rounded-xl bg-blue-100 text-sdBlue-600 flex items-center justify-center">
+                        <i data-lucide="settings" class="w-5 h-5"></i>
+                    </div>
+                    <h3 class="font-display font-extrabold text-lg text-slate-800">Pengaturan Koneksi & Sekolah</h3>
+                </div>
+                <button onclick="closeSettingsModal()" class="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <form id="settings-form" onsubmit="saveSettings(event)" class="mt-5 space-y-4">
+                <!-- Google OAuth Client ID (Untuk Tombol Masuk dengan Google) -->
+                <div>
+                    <label for="input-google-client-id" class="block text-sm font-bold text-slate-700 mb-1">
+                        Google OAuth Client ID <span class="text-xs font-normal text-sdBlue-600">(Untuk Login Google)</span>
+                    </label>
+                    <input type="text" id="input-google-client-id" placeholder="123456789-xxxx.apps.googleusercontent.com" 
+                           class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:border-sdBlue-500 focus:ring-2 focus:ring-blue-200 text-xs sm:text-sm outline-none transition-all" />
+                    <p class="text-[11px] text-slate-500 mt-1">
+                        Diperoleh sekali dari Google Cloud Console agar tombol <strong>Masuk dengan Google</strong> aktif untuk seluruh guru.
+                    </p>
+                </div>
+
+                <!-- Input Gemini API Key (Alternatif Cadangan) -->
+                <div>
+                    <label for="input-api-key" class="block text-sm font-bold text-slate-700 mb-1">
+                        Gemini API Key <span class="text-xs font-normal text-slate-400">(Alternatif jika tanpa OAuth)</span>
+                    </label>
+                    <div class="relative">
+                        <input type="password" id="input-api-key" placeholder="AIzaSy..." 
+                               class="w-full px-3.5 py-2.5 pr-10 rounded-xl border border-slate-300 focus:border-sdBlue-500 focus:ring-2 focus:ring-blue-200 text-sm outline-none transition-all" />
+                        <button type="button" onclick="toggleApiKeyVisibility()" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                            <i id="eye-icon" data-lucide="eye" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Input URL Foto Gedung SDN 150 Barru -->
+                <div>
+                    <label for="input-school-photo" class="block text-sm font-bold text-slate-700 mb-1">
+                        URL Foto Gedung SDN 150 Barru <span class="font-normal text-slate-400">(Opsional)</span>
+                    </label>
+                    <input type="url" id="input-school-photo" placeholder="https://contoh.com/foto-sdn150barru.jpg" 
+                           class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:border-sdBlue-500 focus:ring-2 focus:ring-blue-200 text-sm outline-none transition-all" />
+                </div>
+
+                <!-- Tombol Aksi Modal -->
+                <div class="flex items-center justify-end gap-3 pt-2">
+                    <button type="button" onclick="closeSettingsModal()" class="px-4 py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100 transition-colors">
+                        Batal
+                    </button>
+                    <button type="submit" class="px-5 py-2.5 rounded-xl text-sm font-bold bg-sdBlue-600 hover:bg-sdBlue-700 text-white shadow-md shadow-blue-500/20 transition-all">
+                        Simpan Pengaturan
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ==================== MODAL BAGIKAN 3 OPSI ==================== -->
+    <div id="share-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <h3 class="font-display font-extrabold text-lg text-slate-800">Bagikan Game ke Siswa</h3>
+                <button onclick="closeShareModal()" class="p-1.5 rounded-xl text-slate-400 hover:text-slate-600">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <p id="share-game-subtitle" class="text-xs text-slate-500 font-medium"></p>
+
+            <div class="space-y-2.5">
+                <!-- Opsi 1: Media Sosial (WhatsApp) -->
+                <button onclick="shareToWhatsApp()" class="w-full flex items-center gap-3 p-3.5 rounded-2xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-sm border border-emerald-200 transition-all">
+                    <i data-lucide="message-circle" class="w-5 h-5 text-emerald-600"></i>
+                    <span>1. Bagikan ke Media Sosial (WhatsApp)</span>
+                </button>
+
+                <!-- Opsi 2: Salin Tautan -->
+                <button onclick="copyGameLink()" class="w-full flex items-center gap-3 p-3.5 rounded-2xl bg-blue-50 hover:bg-blue-100 text-sdBlue-700 font-bold text-sm border border-blue-200 transition-all">
+                    <i data-lucide="link" class="w-5 h-5 text-sdBlue-600"></i>
+                    <span>2. Salin Tautan Game</span>
+                </button>
+
+                <!-- Opsi 3: Salin Kode HTML -->
+                <button onclick="copyGameCode()" class="w-full flex items-center gap-3 p-3.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-sm border border-slate-300 transition-all">
+                    <i data-lucide="code-2" class="w-5 h-5 text-slate-600"></i>
+                    <span>3. Salin Kode HTML Lengkap</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== NOTIFIKASI TOAST ==================== -->
+    <div id="toast-notification" class="fixed bottom-5 right-5 z-50 hidden items-center gap-3 bg-slate-900 text-white px-5 py-3.5 rounded-2xl shadow-xl text-sm font-semibold">
+        <i data-lucide="info" class="w-5 h-5 text-sdYellow-400 shrink-0"></i>
+        <span id="toast-message">Pesan notifikasi</span>
+    </div>
+
+    <!-- ==================== FOOTER ==================== -->
+    <footer class="bg-white border-t border-slate-200 py-5 mt-auto">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 text-center text-xs sm:text-sm text-slate-500">
+            &copy; <span id="footer-year">2026</span> <strong>UPTD SDN 150 Barru</strong> &bull; Portal Generator Game Edukasi Berbasis Gemini AI
+        </div>
+    </footer>
+
+    <!-- ==================== SCRIPT LOGIKA SPA, GOOGLE OAUTH & GEMINI AI ==================== -->
+    <script>
+        // Konfigurasi Firebase Realtime Database
+        const firebaseConfig = {
+            apiKey: "AIzaSyArpngNXmHc_H7_G69iAvpMb0UWLjrr4tw",
+            authDomain: "ujicoba-ujian.firebaseapp.com",
+            databaseURL: "https://ujicoba-ujian-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "ujicoba-ujian",
+            storageBucket: "ujicoba-ujian.appspot.com",
+            messagingSenderId: "712473385614",
+            appId: "1:712473385614:web:0664a125020a28db03c7df",
+            measurementId: "G-T0P00YWQMY"
+        };
+
+        // Inisialisasi Firebase
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const rtdb = firebase.database();
+        const gamesRef = rtdb.ref('sdn150barru_games');
+
+        // Kunci penyimpanan localStorage (khusus pengaturan lokal per perangkat)
+        const STORAGE_KEYS = {
+            GOOGLE_CLIENT_ID: 'sdn150barru_google_client_id',
+            API_KEY: 'sdn150barru_gemini_api_key',
+            SCHOOL_PHOTO: 'sdn150barru_school_photo_url'
+        };
+
+        // Client ID Google Cloud terpasang otomatis untuk seluruh guru SDN 150 Barru
+        const DEFAULT_GOOGLE_CLIENT_ID = '712473385614-e1e4t9uo2bp29ik2l1hb3lr7auhi1rb1.apps.googleusercontent.com';
+
+        // State Autentikasi, Database & Generator
+        let googleAccessToken = null;
+        let tokenClient = null;
+        let currentGeneratedCode = '';
+        let currentSavedGameId = null;
+        let activeShareGameId = null;
+        let cachedGamesList = [];
+        let isFirebaseLoaded = false;
+        const MAX_SAVED_GAMES = 50;
+
+        // Inisialisasi saat halaman dimuat
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            loadStoredSettings();
+            subscribeToFirebaseGames();
+            handleInitialRoute();
+        });
+
+        // Dengarkan perubahan hash URL
+        window.addEventListener('hashchange', handleInitialRoute);
+
+        /**
+         * Sinkronisasi Real-time dengan Firebase Realtime Database
+         */
+        function subscribeToFirebaseGames() {
+            gamesRef.on('value', (snapshot) => {
+                const rawVal = snapshot.val();
+                const list = [];
+                if (rawVal) {
+                    Object.keys(rawVal).forEach(key => {
+                        list.push({
+                            id: key,
+                            ...rawVal[key]
+                        });
+                    });
+                }
+                // Urutkan dari yang paling baru dibuat
+                list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+                cachedGamesList = list;
+                isFirebaseLoaded = true;
+
+                renderLibraryList();
+
+                // Jika pengguna membuka tautan langsung #play=ID saat awal masuk
+                const currentHash = window.location.hash.replace('#', '');
+                if (currentHash.startsWith('play=')) {
+                    const targetId = currentHash.split('=')[1];
+                    const playSection = document.getElementById('page-play');
+                    if (playSection && playSection.classList.contains('hidden')) {
+                        openGameInFullscreen(targetId);
+                    }
+                }
+            }, (error) => {
+                console.error('Firebase Read Error:', error);
+                showToast('Gagal memuat data dari Firebase. Periksa koneksi atau Rules database.');
+            });
+        }
+
+        /**
+         * Memuat pengaturan tersimpan (Google Client ID, API Key & Foto Sekolah)
+         */
+        function loadStoredSettings() {
+            const savedClientId = localStorage.getItem(STORAGE_KEYS.GOOGLE_CLIENT_ID) || DEFAULT_GOOGLE_CLIENT_ID;
+            const savedKey = localStorage.getItem(STORAGE_KEYS.API_KEY) || '';
+            const savedPhoto = localStorage.getItem(STORAGE_KEYS.SCHOOL_PHOTO) || '';
+
+            document.getElementById('input-google-client-id').value = savedClientId;
+            document.getElementById('input-api-key').value = savedKey;
+            document.getElementById('input-school-photo').value = savedPhoto;
+
+            updateAuthStatusUI();
+            applySchoolPhoto(savedPhoto);
+        }
+
+        /**
+         * Navigasi SPA antar 4 halaman utama (home, create, library, play)
+         */
+        function navigateTo(pageName) {
+            document.querySelectorAll('.page-section').forEach(sec => {
+                sec.classList.add('hidden');
+            });
+
+            const targetSection = document.getElementById(`page-${pageName}`);
+            if (targetSection) {
+                targetSection.classList.remove('hidden');
+            }
+
+            if (pageName !== 'play') {
+                window.history.replaceState(null, '', `#${pageName}`);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+
+            if (pageName === 'library') {
+                renderLibraryList();
+            }
+        }
+
+        /**
+         * Membaca hash URL saat halaman pertama kali dibuka (termasuk #play=ID)
+         */
+        function handleInitialRoute() {
+            const hash = window.location.hash.replace('#', '');
+            if (hash.startsWith('play=')) {
+                const gameId = hash.split('=')[1];
+                openGameInFullscreen(gameId);
+            } else if (['home', 'create', 'library'].includes(hash)) {
+                navigateTo(hash);
+            } else {
+                navigateTo('home');
+            }
+        }
+
+        /**
+         * Login dengan Akun Google (OAuth 2.0) untuk akses langsung ke Gemini AI
+         */
+        function handleGoogleLogin() {
+            const clientId = (localStorage.getItem(STORAGE_KEYS.GOOGLE_CLIENT_ID) || DEFAULT_GOOGLE_CLIENT_ID).trim();
+
+            if (!clientId) {
+                showToast('Masukkan Google OAuth Client ID terlebih dahulu di Pengaturan.');
+                openSettingsModal('clientId');
+                return;
+            }
+
+            if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
+                showToast('Layanan Google Sign-In sedang dimuat. Silakan coba sesaat lagi.');
+                return;
+            }
+
+            tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: clientId,
+                scope: 'https://www.googleapis.com/auth/generative-language https://www.googleapis.com/auth/userinfo.profile',
+                callback: async (tokenResponse) => {
+                    if (tokenResponse && tokenResponse.access_token) {
+                        googleAccessToken = tokenResponse.access_token;
+                        await fetchGoogleUserProfile(googleAccessToken);
+                        updateAuthStatusUI();
+                        showToast('Berhasil masuk dengan Akun Google!');
+                    } else {
+                        showToast('Login Google dibatalkan atau gagal.');
+                    }
+                }
+            });
+
+            tokenClient.requestAccessToken({ prompt: 'consent' });
+        }
+
+        /**
+         * Mengambil nama dan foto profil akun Google guru yang login
+         */
+        async function fetchGoogleUserProfile(accessToken) {
+            try {
+                const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                    headers: { Authorization: `Bearer ${accessToken}` }
+                });
+                if (res.ok) {
+                    const user = await res.json();
+                    document.getElementById('google-user-name').textContent = user.given_name || user.name || 'Guru SDN 150';
+                    if (user.picture) {
+                        const avatar = document.getElementById('google-user-avatar');
+                        avatar.src = user.picture;
+                        avatar.classList.remove('hidden');
+                    }
+                }
+            } catch (e) {
+                console.warn('Profil Google tidak terbaca:', e);
+            }
+        }
+
+        /**
+         * Membaca hash URL saat halaman pertama kali dibuka (termasuk #play=ID)
+         */
+        function handleInitialRoute() {
+            const hash = window.location.hash.replace('#', '');
+            if (hash.startsWith('play=')) {
+                const gameId = hash.split('=')[1];
+                openGameInFullscreen(gameId);
+            } else if (['home', 'create', 'library'].includes(hash)) {
+                navigateTo(hash);
+            } else {
+                navigateTo('home');
+            }
+        }
+
+        /**
+         * Menyimpan Game ke Firebase (Batas Maksimal 50 Game - Hapus Paling Lama Otomatis)
+         */
+        function getSavedGames() {
+            return cachedGamesList;
+        }
+
+        async function saveCurrentGame() {
+            if (!currentGeneratedCode) {
+                showToast('Generate game terlebih dahulu sebelum menyimpan.');
+                return;
+            }
+
+            const btnSave = document.getElementById('btn-save-game');
+            const originalHtml = btnSave.innerHTML;
+            btnSave.disabled = true;
+            btnSave.innerHTML = '<span>Menyimpan ke Cloud...</span>';
+
+            try {
+                // Ambil daftar terkini dari Firebase untuk mengecek batas 50 game
+                const snapshot = await gamesRef.once('value');
+                const existingData = snapshot.val() || {};
+                const existingEntries = Object.entries(existingData).map(([id, val]) => ({
+                    id,
+                    createdAt: val.createdAt || 0
+                }));
+
+                // Urutkan dari yang paling lama (createdAt terkecil)
+                existingEntries.sort((a, b) => a.createdAt - b.createdAt);
+
+                // Jika jumlah game sudah >= 50, hapus game paling lama secara otomatis
+                while (existingEntries.length >= MAX_SAVED_GAMES) {
+                    const oldest = existingEntries.shift();
+                    if (oldest && oldest.id) {
+                        await gamesRef.child(oldest.id).remove();
+                    }
+                }
+
+                const newGameRef = gamesRef.push();
+                const newId = newGameRef.key;
+
+                const gameRecord = {
+                    title: document.getElementById('cfg-title').value.trim() || 'Game Edukasi SD',
+                    grade: document.getElementById('cfg-grade').value,
+                    subject: document.getElementById('cfg-subject').value,
+                    topic: document.getElementById('cfg-topic').value.trim(),
+                    gameType: document.getElementById('cfg-game-type').value,
+                    playerMode: document.getElementById('cfg-player-mode').value,
+                    code: currentGeneratedCode,
+                    createdAt: Date.now()
+                };
+
+                await newGameRef.set(gameRecord);
+
+                currentSavedGameId = newId;
+                const actionBtns = document.getElementById('saved-action-buttons');
+                actionBtns.classList.remove('hidden');
+                actionBtns.classList.add('flex');
+
+                showToast('Game berhasil disimpan ke Cloud! (Maks. 50 game)');
+            } catch (error) {
+                console.error('Firebase Save Error:', error);
+                showToast('Gagal menyimpan ke Firebase: ' + error.message);
+            } finally {
+                btnSave.disabled = false;
+                btnSave.innerHTML = originalHtml;
+                lucide.createIcons();
+            }
+        }
+
+        function playSavedGameNow() {
+            if (currentSavedGameId) {
+                openGameInFullscreen(currentSavedGameId);
+            }
+        }
+
+        /**
+         * Membuka Halaman Bermain Layar Penuh (#play=id) langsung dari Firebase
+         */
+        async function openGameInFullscreen(gameId) {
+            // Cek di cache terlebih dahulu agar instan
+            let found = cachedGamesList.find(g => g.id === gameId);
+
+            // Jika belum ada di cache (misalnya siswa langsung membuka link #play=ID), tarik langsung dari Firebase
+            if (!found) {
+                try {
+                    const snap = await gamesRef.child(gameId).once('value');
+                    if (snap.exists()) {
+                        found = { id: gameId, ...snap.val() };
+                    }
+                } catch (e) {
+                    console.error('Fetch single game error:', e);
+                }
+            }
+
+            if (!found) {
+                showToast('Game tidak ditemukan atau sudah terhapus dari daftar.');
+                navigateTo('home');
+                return;
+            }
+
+            document.getElementById('play-page-title').textContent = `${found.title} (${found.grade} - ${found.subject})`;
+            document.getElementById('play-fullscreen-iframe').srcdoc = found.code;
+            window.location.hash = `play=${found.id}`;
+            navigateTo('play');
+        }
+
+        function exitPlayPage() {
+            document.getElementById('play-fullscreen-iframe').srcdoc = '';
+            navigateTo('home');
+        }
+
+        /**
+         * Render Daftar Game Tersimpan (#library)
+         */
+        function renderLibraryList() {
+            const grid = document.getElementById('library-grid');
+            const badge = document.getElementById('library-count-badge');
+            if (!grid || !badge) return;
+
+            if (!isFirebaseLoaded) {
+                badge.textContent = 'Menghubungkan Cloud...';
+                return;
+            }
+
+            let games = [...cachedGamesList];
+            badge.textContent = `${games.length} / ${MAX_SAVED_GAMES} Game Tersimpan`;
+
+            const query = (document.getElementById('lib-search')?.value || '').toLowerCase();
+            const gradeFilter = document.getElementById('lib-filter-grade')?.value || '';
+            const sortBy = document.getElementById('lib-sort')?.value || 'newest';
+
+            // Filter pencarian & kelas
+            games = games.filter(g => {
+                const matchSearch = !query ||
+                    (g.title || '').toLowerCase().includes(query) ||
+                    (g.subject || '').toLowerCase().includes(query) ||
+                    (g.topic || '').toLowerCase().includes(query);
+                const matchGrade = !gradeFilter || (g.grade || '').includes(gradeFilter);
+                return matchSearch && matchGrade;
+            });
+
+            // Pengurutan kategori
+            games.sort((a, b) => {
+                if (sortBy === 'title') return (a.title || '').localeCompare(b.title || '');
+                if (sortBy === 'grade') return (a.grade || '').localeCompare(b.grade || '');
+                if (sortBy === 'subject') return (a.subject || '').localeCompare(b.subject || '');
+                if (sortBy === 'topic') return (a.topic || '').localeCompare(b.topic || '');
+                return (b.createdAt || 0) - (a.createdAt || 0);
+            });
+
+            if (games.length === 0) {
+                grid.innerHTML = `
+                    <div class="col-span-full bg-white rounded-3xl p-10 border border-dashed border-slate-300 text-center space-y-3">
+                        <p class="font-display font-extrabold text-lg text-slate-700">Belum ada game yang sesuai</p>
+                        <p class="text-sm text-slate-500">Buat game edukasi pertama Anda di halaman Buat Game Baru.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            grid.innerHTML = games.map(g => `
+                <div class="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-all flex flex-col justify-between gap-4">
+                    <div class="space-y-2">
+                        <div class="flex flex-wrap items-center gap-1.5">
+                            <span class="px-2.5 py-0.5 rounded-full bg-blue-100 text-sdBlue-700 text-xs font-bold">${escapeHtml(g.grade)}</span>
+                            <span class="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-xs font-bold">${escapeHtml(g.subject)}</span>
+                        </div>
+                        <h3 class="font-display font-extrabold text-lg text-slate-800 leading-snug">${escapeHtml(g.title)}</h3>
+                        <p class="text-xs text-slate-600 line-clamp-2"><strong>Materi:</strong> ${escapeHtml(g.topic)}</p>
+                        <p class="text-[11px] text-slate-400">${escapeHtml(g.gameType)} • ${escapeHtml(g.playerMode)}</p>
+                    </div>
+                    <div class="pt-3 border-t border-slate-100 flex items-center gap-2">
+                        <button onclick="openGameInFullscreen('${g.id}')" class="flex-grow inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-sdBlue-600 hover:bg-sdBlue-700 text-white font-bold text-xs transition-all">
+                            <i data-lucide="play" class="w-3.5 h-3.5"></i>
+                            <span>Mainkan</span>
+                        </button>
+                        <button onclick="openShareModal('${g.id}')" class="inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-all" title="Bagikan">
+                            <i data-lucide="share-2" class="w-3.5 h-3.5"></i>
+                        </button>
+                        <button onclick="deleteSavedGame('${g.id}')" class="inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 font-bold text-xs transition-all" title="Hapus Game">
+                            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+
+            lucide.createIcons();
+        }
+
+        async function deleteSavedGame(gameId) {
+            try {
+                await gamesRef.child(gameId).remove();
+                showToast('Game berhasil dihapus dari Cloud.');
+            } catch (error) {
+                showToast('Gagal menghapus game: ' + error.message);
+            }
+        }
+
+        /**
+         * Logout Akun Google dari sesi aplikasi
+         */
+        function handleGoogleLogout() {
+            if (googleAccessToken && typeof google !== 'undefined') {
+                google.accounts.oauth2.revoke(googleAccessToken, () => {});
+            }
+            googleAccessToken = null;
+            document.getElementById('google-user-avatar').classList.add('hidden');
+            updateAuthStatusUI();
+            showToast('Berhasil keluar dari akun Google.');
+        }
+
+        /**
+         * Memperbarui tampilan status login Google / API Key di Navbar & Halaman Buat Game
+         */
+        function updateAuthStatusUI() {
+            const btnLogin = document.getElementById('btn-google-login');
+            const profileBox = document.getElementById('google-user-profile');
+            const createBadge = document.getElementById('auth-indicator-create');
+            const fallbackKey = (localStorage.getItem(STORAGE_KEYS.API_KEY) || '').trim();
+
+            if (googleAccessToken) {
+                btnLogin.classList.add('hidden');
+                profileBox.classList.remove('hidden');
+                profileBox.classList.add('flex');
+                createBadge.className = 'px-3 py-1.5 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold';
+                createBadge.textContent = 'Terhubung: Akun Google Aktif';
+            } else {
+                btnLogin.classList.remove('hidden');
+                profileBox.classList.add('hidden');
+                profileBox.classList.remove('flex');
+
+                if (fallbackKey.length > 10) {
+                    createBadge.className = 'px-3 py-1.5 rounded-full bg-blue-100 text-sdBlue-700 text-xs font-bold';
+                    createBadge.textContent = 'Terhubung: API Key Cadangan';
+                } else {
+                    createBadge.className = 'px-3 py-1.5 rounded-full bg-amber-100 text-amber-800 text-xs font-bold';
+                    createBadge.textContent = 'Silakan Masuk dengan Google';
+                }
+            }
+        }
+
+        /**
+         * Fungsi Pemanggil Gemini API (Mendukung Token OAuth Google & API Key Cadangan)
+         */
+        async function callGeminiModel(promptText) {
+            const fallbackApiKey = (localStorage.getItem(STORAGE_KEYS.API_KEY) || '').trim();
+
+            if (!googleAccessToken && !fallbackApiKey) {
+                throw new Error('Silakan klik tombol "Masuk dengan Google" di pojok kanan atas terlebih dahulu.');
+            }
+
+            const modelName = 'gemini-2.5-flash';
+            let url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
+            const headers = { 'Content-Type': 'application/json' };
+
+            if (googleAccessToken) {
+                headers['Authorization'] = `Bearer ${googleAccessToken}`;
+            } else {
+                url += `?key=${encodeURIComponent(fallbackApiKey)}`;
+            }
+
+            const payload = {
+                contents: [{ parts: [{ text: promptText }] }],
+                generationConfig: {
+                    temperature: 0.7
+                }
+            };
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const errData = await response.json().catch(() => ({}));
+                throw new Error(errData?.error?.message || `Gagal menghubungi Gemini AI (HTTP ${response.status})`);
+            }
+
+            const data = await response.json();
+            let rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            // Bersihkan pembungkus markdown ```html ... ``` jika ada
+            rawText = rawText.replace(/^```html\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+            return rawText;
+        }
+
+        /**
+         * Generate Game Edukasi Baru dari Formulir Guru
+         */
+        async function generateEduGame(event) {
+            event.preventDefault();
+
+            const title = document.getElementById('cfg-title').value.trim();
+            const grade = document.getElementById('cfg-grade').value;
+            const subject = document.getElementById('cfg-subject').value;
+            const topic = document.getElementById('cfg-topic').value.trim();
+            const gameType = document.getElementById('cfg-game-type').value;
+            const playerMode = document.getElementById('cfg-player-mode').value;
+            const count = document.getElementById('cfg-count').value;
+            const difficulty = document.getElementById('cfg-difficulty').value;
+            const timer = document.getElementById('cfg-timer').value;
+            const theme = document.getElementById('cfg-theme').value;
+            const sound = document.getElementById('cfg-sound').value;
+            const extraPrompt = document.getElementById('cfg-extra-prompt').value.trim();
+
+            setPreviewLoading(true, 'Gemini AI sedang merakit game edukasi sesuai pengaturan Anda...');
+
+            const masterPrompt = `
+Buatkan satu file HTML tunggal lengkap (HTML + CSS + JavaScript dalam satu file) untuk game edukasi Sekolah Dasar interaktif yang siap dimainkan langsung di browser.
+
+SPESIFIKASI GAME:
+- Sekolah: UPTD SDN 150 Barru
+- Judul Game: ${title}
+- Jenjang Kelas: ${grade}
+- Mata Pelajaran: ${subject}
+- Topik/Materi: ${topic}
+- Jenis Permainan: ${gameType}
+- Mode Pemain: ${playerMode}
+- Jumlah Soal/Tantangan: ${count}
+- Tingkat Kesulitan: ${difficulty}
+- Pengaturan Waktu: ${timer}
+- Tema Visual: ${theme}
+- Suara: ${sound}
+${extraPrompt ? `- Instruksi Tambahan Guru: ${extraPrompt}` : ''}
+
+ATURAN WAJIB TEKNIS & DESAIN:
+1. Hasilkan HANYA kode HTML murni yang dimulai dengan <!DOCTYPE html> dan diakhiri dengan </html>. JANGAN sertakan penjelasan teks apa pun di luar kode.
+2. Desain harus sangat cerah, ramah anak SD, responsif untuk layar HP maupun laptop/proyektor kelas, dengan tombol besar yang mudah disentuh.
+3. Jangan gunakan gambar eksternal dari URL internet (gunakan ilustrasi SVG inline, CSS shapes, atau Emoji agar tidak pernah broken image).
+4. Wajib memiliki: Layar Mulai (dengan aturan main singkat & tombol Mulai), Gameplay interaktif sesuai mode pemain yang dipilih (misal jika Duel 2 Pemain, buat tampilan terbagi dua yang adil), penghitung skor real-time, umpan balik langsung benar/salah, dan Layar Akhir (Skor akhir, bintang penghargaan, dan tombol Main Lagi).
+5. Jangan pernah menggunakan alert() atau confirm() bawaan browser.
+`;
+
+            try {
+                const generatedHtml = await callGeminiModel(masterPrompt);
+                currentGeneratedCode = generatedHtml;
+                currentSavedGameId = null;
+
+                renderCodeToPreview(generatedHtml);
+                document.getElementById('post-generate-panel').classList.remove('hidden');
+                document.getElementById('saved-action-buttons').classList.add('hidden');
+                showToast('Game berhasil dibuat! Silakan uji coba.');
+            } catch (error) {
+                showToast(error.message);
+            } finally {
+                setPreviewLoading(false);
+            }
+        }
+
+        /**
+         * Revisi Game yang Sudah Di-generate (Iteratif)
+         */
+        async function reviseEduGame() {
+            const revisionNote = document.getElementById('revision-prompt-input').value.trim();
+            if (!revisionNote) {
+                showToast('Tuliskan instruksi revisi terlebih dahulu.');
+                return;
+            }
+            if (!currentGeneratedCode) {
+                showToast('Belum ada game untuk direvisi.');
+                return;
+            }
+
+            setPreviewLoading(true, 'Menyempurnakan game sesuai catatan revisi Anda...');
+
+            const revisionPrompt = `
+Berikut adalah kode HTML game edukasi yang sudah dibuat sebelumnya:
+${currentGeneratedCode}
+
+INSTRUKSI REVISI DARI GURU:
+"${revisionNote}"
+
+Perbarui kode HTML di atas agar menerapkan instruksi revisi tersebut dengan sempurna tanpa merusak fitur yang sudah berjalan.
+Kembalikan HANYA kode HTML lengkap dari <!DOCTYPE html> sampai </html> tanpa teks penjelasan tambahan.
+`;
+
+            try {
+                const updatedHtml = await callGeminiModel(revisionPrompt);
+                currentGeneratedCode = updatedHtml;
+                currentSavedGameId = null;
+
+                renderCodeToPreview(updatedHtml);
+                document.getElementById('revision-prompt-input').value = '';
+                document.getElementById('saved-action-buttons').classList.add('hidden');
+                showToast('Revisi game berhasil diterapkan!');
+            } catch (error) {
+                showToast(error.message);
+            } finally {
+                setPreviewLoading(false);
+            }
+        }
+
+        function setPreviewLoading(isLoading, message = '') {
+            const loader = document.getElementById('preview-loading-state');
+            const subtext = document.getElementById('loading-subtext');
+            if (isLoading) {
+                subtext.textContent = message;
+                loader.classList.remove('hidden');
+            } else {
+                loader.classList.add('hidden');
+            }
+        }
+
+        function renderCodeToPreview(htmlCode) {
+            const emptyState = document.getElementById('preview-empty-state');
+            const iframe = document.getElementById('game-preview-iframe');
+            const reloadBtn = document.getElementById('btn-reload-preview');
+
+            emptyState.classList.add('hidden');
+            iframe.classList.remove('hidden');
+            reloadBtn.classList.remove('hidden');
+            iframe.srcdoc = htmlCode;
+        }
+
+        function reloadPreviewIframe() {
+            if (currentGeneratedCode) {
+                document.getElementById('game-preview-iframe').srcdoc = currentGeneratedCode;
+            }
+        }
+
+        /**
+         * Modal Bagikan 3 Opsi (Media Sosial, Salin Tautan, Salin Kode)
+         */
+        function openShareModal(gameId) {
+            const game = getSavedGames().find(g => g.id === gameId);
+            if (!game) return;
+            activeShareGameId = gameId;
+            document.getElementById('share-game-subtitle').textContent = `${game.title} (${game.grade} - ${game.subject})`;
+            const modal = document.getElementById('share-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeShareModal() {
+            const modal = document.getElementById('share-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function getShareUrlForGame(gameId) {
+            const baseUrl = window.location.href.split('#')[0];
+            return `${baseUrl}#play=${gameId}`;
+        }
+
+        function shareToWhatsApp() {
+            const game = getSavedGames().find(g => g.id === activeShareGameId);
+            if (!game) return;
+            const link = getShareUrlForGame(game.id);
+            const text = `Ayo mainkan Game Edukasi SDN 150 Barru: *${game.title}* (${game.grade} - ${game.subject})!\nKlik tautan berikut: ${link}`;
+            window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
+        }
+
+        function copyGameLink() {
+            if (!activeShareGameId) return;
+            copyTextToClipboard(getShareUrlForGame(activeShareGameId), 'Tautan game berhasil disalin!');
+        }
+
+        function copyGameCode() {
+            const game = getSavedGames().find(g => g.id === activeShareGameId);
+            if (!game) return;
+            copyTextToClipboard(game.code, 'Kode HTML lengkap berhasil disalin!');
+        }
+
+        function copyTextToClipboard(text, successMsg) {
+            const tempInput = document.createElement('textarea');
+            tempInput.value = text;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempInput);
+            showToast(successMsg);
+            closeShareModal();
+        }
+
+        function escapeHtml(str) {
+            return String(str || '').replace(/[&<>"']/g, m => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[m]));
+        }
+
+        /**
+         * Menampilkan foto sekolah dari URL atau kembali ke ilustrasi bawaan
+         */
+        function applySchoolPhoto(url) {
+            const imgEl = document.getElementById('school-hero-image');
+            const fallbackEl = document.getElementById('school-fallback-illustration');
+            if (!imgEl || !fallbackEl) return;
+
+            if (url && url.trim() !== '') {
+                imgEl.src = url.trim();
+                imgEl.classList.remove('hidden');
+                fallbackEl.classList.add('hidden');
+            } else {
+                handleSchoolImageError();
+            }
+        }
+
+        /**
+         * Fallback jika URL gambar sekolah gagal dimuat atau kosong
+         */
+        function handleSchoolImageError() {
+            const imgEl = document.getElementById('school-hero-image');
+            const fallbackEl = document.getElementById('school-fallback-illustration');
+            if (!imgEl || !fallbackEl) return;
+            imgEl.classList.add('hidden');
+            fallbackEl.classList.remove('hidden');
+        }
+
+        /**
+         * Membuka Modal Pengaturan
+         */
+        function openSettingsModal(focusField = null) {
+            const modal = document.getElementById('settings-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+
+            if (focusField === 'photo') {
+                setTimeout(() => document.getElementById('input-school-photo').focus(), 100);
+            } else if (focusField === 'clientId') {
+                setTimeout(() => document.getElementById('input-google-client-id').focus(), 100);
+            }
+        }
+
+        /**
+         * Menutup Modal Pengaturan
+         */
+        function closeSettingsModal() {
+            const modal = document.getElementById('settings-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        /**
+         * Menyimpan pengaturan ke localStorage
+         */
+        function saveSettings(event) {
+            event.preventDefault();
+            const clientId = document.getElementById('input-google-client-id').value.trim();
+            const apiKey = document.getElementById('input-api-key').value.trim();
+            const photoUrl = document.getElementById('input-school-photo').value.trim();
+
+            localStorage.setItem(STORAGE_KEYS.GOOGLE_CLIENT_ID, clientId);
+            localStorage.setItem(STORAGE_KEYS.API_KEY, apiKey);
+            localStorage.setItem(STORAGE_KEYS.SCHOOL_PHOTO, photoUrl);
+
+            updateAuthStatusUI();
+            applySchoolPhoto(photoUrl);
+            closeSettingsModal();
+            showToast('Pengaturan berhasil disimpan!');
+        }
+
+        /**
+         * Toggle tampil/sembunyi teks API Key
+         */
+        function toggleApiKeyVisibility() {
+            const input = document.getElementById('input-api-key');
+            input.type = input.type === 'password' ? 'text' : 'password';
+        }
+
+        /**
+         * Menampilkan notifikasi toast singkat
+         */
+        function showToast(message) {
+            const toast = document.getElementById('toast-notification');
+            document.getElementById('toast-message').textContent = message;
+            toast.classList.remove('hidden');
+            toast.classList.add('flex');
+
+            setTimeout(() => {
+                toast.classList.add('hidden');
+                toast.classList.remove('flex');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
