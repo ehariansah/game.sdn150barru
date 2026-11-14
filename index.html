@@ -734,6 +734,389 @@
         window.addEventListener('hashchange', handleInitialRoute);
 
         /**
+         * Memuat Pengaturan Lokal & Tampilan Awal
+         */
+        function loadStoredSettings() {
+            const savedPhoto = localStorage.getItem(STORAGE_KEYS.SCHOOL_PHOTO) || '';
+            const savedClientId = localStorage.getItem(STORAGE_KEYS.GOOGLE_CLIENT_ID) || DEFAULT_GOOGLE_CLIENT_ID;
+
+            const photoInput = document.getElementById('input-school-photo');
+            const clientInput = document.getElementById('input-google-client-id');
+            if (photoInput) photoInput.value = savedPhoto;
+            if (clientInput) clientInput.value = savedClientId;
+
+            applySchoolPhoto(savedPhoto);
+        }
+
+        function getEffectiveApiKey() {
+            return sharedSchoolApiKey || DEFAULT_GEMINI_API_KEY;
+        }
+
+        /**
+         * Sinkronisasi Pengaturan Sekolah dari Firebase
+         */
+        function subscribeToFirebaseConfig() {
+            configRef.on('value', (snapshot) => {
+                const val = snapshot.val();
+                if (!val) return;
+                if (val.schoolPhotoUrl && !localStorage.getItem(STORAGE_KEYS.SCHOOL_PHOTO)) {
+                    applySchoolPhoto(val.schoolPhotoUrl);
+                }
+            }, (err) => {
+                console.warn('Info config Firebase:', err.message);
+            });
+        }
+
+        /**
+         * Sinkronisasi Daftar Game Tersimpan dari Firebase Realtime Database
+         */
+        function subscribeToFirebaseGames() {
+            gamesRef.on('value', (snapshot) => {
+                isFirebaseLoaded = true;
+                const dataObj = snapshot.val() || {};
+                cachedGamesList = Object.keys(dataObj).map((key) => ({
+                    id: key,
+                    ...dataObj[key]
+                }));
+
+                // Urutkan terbaru secara default
+                cachedGamesList.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+                const badge = document.getElementById('library-count-badge');
+                if (badge) {
+                    badge.textContent = `${cachedGamesList.length} / ${MAX_SAVED_GAMES} Game Tersimpan`;
+                }
+
+                renderLibraryList();
+            }, (error) => {
+                console.error('Firebase Read Error:', error);
+                const badge = document.getElementById('library-count-badge');
+                if (badge) badge.textContent = 'Gagal memuat database';
+            });
+        }
+
+        /**
+         * Navigasi SPA 4 Halaman (#home, #create, #library, #play=ID)
+         */
+        function handleInitialRoute() {
+            const hash = window.location.hash || '#home';
+            if (hash.startsWith('#play=')) {
+                const gameId = decodeURIComponent(hash.replace('#play=', '').trim());
+                openPlayPageById(gameId);
+                return;
+            }
+            const pageName = hash.replace('#', '');
+            if (['home', 'create', 'library'].includes(pageName)) {
+                showPageSection(pageName);
+            } else {
+                showPageSection('home');
+            }
+        }
+
+        function navigateTo(pageName) {
+            window.location.hash = `#${pageName}`;
+            showPageSection(pageName);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function showPageSection(pageName) {
+            document.querySelectorAll('.page-section').forEach((sec) => sec.classList.add('hidden'));
+            const target = document.getElementById(`page-${pageName}`);
+            if (target) target.classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        /**
+         * Login & Logout Akun Google (OAuth 2.0 - Profil & Email)
+         */
+        function handleGoogleLogin() {
+            const clientId = localStorage.getItem(STORAGE_KEYS.GOOGLE_CLIENT_ID) || DEFAULT_GOOGLE_CLIENT_ID;
+            if (!window.google || !google.accounts || !google.accounts.oauth2) {
+                showToast('Layanan Google sedang dimuat, silakan coba beberapa detik lagi.');
+                return;
+            }
+
+            try {
+                tokenClient = google.accounts.oauth2.initTokenClient({
+                    client_id: clientId,
+                    scope: 'openid email profile',
+                    callback: async (tokenResponse) => {
+                        if (tokenResponse && tokenResponse.access_token) {
+                            googleAccessToken = tokenResponse.access_token;
+                            await fetchGoogleUserProfile(googleAccessToken);
+                        }
+                    }
+                });
+                tokenClient.requestAccessToken({ prompt: 'select_account' });
+            } catch (err) {
+                console.error('Google OAuth Error:', err);
+                showToast('Gagal membuka login Google: ' + err.message);
+            }
+        }
+
+        async function fetchGoogleUserProfile(accessToken) {
+            try {
+                const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                    headers: { Authorization: `Bearer ${accessToken}` }
+                });
+                const profile = await res.json();
+                googleUserProfile = profile;
+
+                const btnLogin = document.getElementById('btn-google-login');
+                const profileBox = document.getElementById('google-user-profile');
+                const nameEl = document.getElementById('google-user-name');
+                const avatarEl = document.getElementById('google-user-avatar');
+
+                if (btnLogin) btnLogin.classList.add('hidden');
+                if (profileBox) {
+                    profileBox.classList.remove('hidden');
+                    profileBox.classList.add('flex');
+                }
+                if (nameEl) nameEl.textContent = profile.name || profile.email || 'Guru SDN 150';
+                if (avatarEl && profile.picture) {
+                    avatarEl.src = profile.picture;
+                    avatarEl.classList.remove('hidden');
+                }
+
+                showToast(`Selamat datang, ${profile.name || 'Bapak/Ibu Guru'}!`);
+            } catch (e) {
+                console.warn('Gagal mengambil profil Google:', e);
+            }
+        }
+
+        function handleGoogleLogout() {
+            if (googleAccessToken && window.google?.accounts?.oauth2) {
+                google.accounts.oauth2.revoke(googleAccessToken, () => {});
+            }
+            googleAccessToken = null;
+            googleUserProfile = null;
+
+            const btnLogin = document.getElementById('btn-google-login');
+            const profileBox = document.getElementById('google-user-profile');
+            if (btnLogin) btnLogin.classList.remove('hidden');
+            if (profileBox) {
+                profileBox.classList.add('hidden');
+                profileBox.classList.remove('flex');
+            }
+            showToast('Berhasil keluar dari akun Google.');
+        }
+
+        /**
+         * Simpan Game ke Firebase (Otomatis Hapus Terlama jika >= 50 Game)
+         */
+        async function saveCurrentGame() {
+            if (!currentGeneratedCode) {
+                showToast('Belum ada game yang bisa disimpan.');
+                return;
+            }
+
+            const title = document.getElementById('cfg-title').value.trim() || 'Game Edukasi SDN 150 Barru';
+            const grade = document.getElementById('cfg-grade').value;
+            const subject = document.getElementById('cfg-subject').value;
+            const topic = document.getElementById('cfg-topic').value.trim();
+            const gameType = document.getElementById('cfg-game-type').value;
+            const playerMode = document.getElementById('cfg-player-mode').value;
+            const authorName = googleUserProfile?.name || 'Guru SDN 150 Barru';
+
+            const btnSave = document.getElementById('btn-save-game');
+            if (btnSave) btnSave.disabled = true;
+
+            try {
+                // Cek jumlah game saat ini di Firebase
+                const snap = await gamesRef.once('value');
+                const allData = snap.val() || {};
+                const entries = Object.keys(allData).map((k) => ({
+                    id: k,
+                    createdAt: allData[k].createdAt || 0
+                }));
+
+                // Jika sudah mencapai batas 50 game, hapus yang paling lama
+                if (entries.length >= MAX_SAVED_GAMES) {
+                    entries.sort((a, b) => a.createdAt - b.createdAt);
+                    const excessCount = entries.length - MAX_SAVED_GAMES + 1;
+                    for (let i = 0; i < excessCount; i++) {
+                        await gamesRef.child(entries[i].id).remove();
+                    }
+                }
+
+                // Simpan game baru
+                const newRef = gamesRef.push();
+                const gameData = {
+                    title,
+                    grade,
+                    subject,
+                    topic,
+                    gameType,
+                    playerMode,
+                    author: authorName,
+                    code: currentGeneratedCode,
+                    createdAt: Date.now()
+                };
+
+                await newRef.set(gameData);
+                currentSavedGameId = newRef.key;
+
+                const actionBtns = document.getElementById('saved-action-buttons');
+                if (actionBtns) {
+                    actionBtns.classList.remove('hidden');
+                    actionBtns.classList.add('flex');
+                }
+
+                showToast('Game berhasil disimpan ke daftar sekolah!');
+            } catch (err) {
+                console.error('Save Game Error:', err);
+                showToast('Gagal menyimpan ke Firebase: ' + err.message);
+            } finally {
+                if (btnSave) btnSave.disabled = false;
+            }
+        }
+
+        function playSavedGameNow() {
+            if (!currentSavedGameId) {
+                showToast('Silakan simpan game terlebih dahulu.');
+                return;
+            }
+            window.location.hash = `#play=${currentSavedGameId}`;
+        }
+
+        /**
+         * Halaman Bermain Fullscreen (#play=ID)
+         */
+        async function openPlayPageById(gameId) {
+            showPageSection('play');
+            const titleEl = document.getElementById('play-page-title');
+            const iframe = document.getElementById('play-fullscreen-iframe');
+
+            if (titleEl) titleEl.textContent = 'Memuat permainan...';
+            if (iframe) iframe.srcdoc = '<div style="font-family:sans-serif;text-align:center;padding:40px;color:#475569;">Memuat game edukasi SDN 150 Barru...</div>';
+
+            try {
+                let gameObj = cachedGamesList.find((g) => g.id === gameId);
+                if (!gameObj) {
+                    const snap = await gamesRef.child(gameId).once('value');
+                    gameObj = snap.val();
+                }
+
+                if (!gameObj || !gameObj.code) {
+                    if (titleEl) titleEl.textContent = 'Game Tidak Ditemukan';
+                    if (iframe) iframe.srcdoc = '<div style="font-family:sans-serif;text-align:center;padding:40px;color:#dc2626;">Maaf, game ini tidak ditemukan atau sudah dihapus.</div>';
+                    return;
+                }
+
+                if (titleEl) titleEl.textContent = `${gameObj.title} (${gameObj.grade})`;
+                if (iframe) iframe.srcdoc = gameObj.code;
+            } catch (err) {
+                console.error('Load Play Game Error:', err);
+                if (titleEl) titleEl.textContent = 'Gagal Memuat Game';
+            }
+        }
+
+        function exitPlayPage() {
+            const iframe = document.getElementById('play-fullscreen-iframe');
+            if (iframe) iframe.srcdoc = '';
+            navigateTo('home');
+        }
+
+        /**
+         * Render & Filter Halaman Daftar Game Tersimpan (#library)
+         */
+        function renderLibraryList() {
+            const grid = document.getElementById('library-grid');
+            if (!grid) return;
+
+            if (!isFirebaseLoaded) return;
+
+            const searchQuery = (document.getElementById('lib-search')?.value || '').toLowerCase().trim();
+            const gradeFilter = document.getElementById('lib-filter-grade')?.value || '';
+            const sortBy = document.getElementById('lib-sort')?.value || 'newest';
+
+            let filtered = cachedGamesList.filter((item) => {
+                const matchGrade = !gradeFilter || (item.grade || '').includes(gradeFilter);
+                const matchSearch = !searchQuery ||
+                    (item.title || '').toLowerCase().includes(searchQuery) ||
+                    (item.subject || '').toLowerCase().includes(searchQuery) ||
+                    (item.topic || '').toLowerCase().includes(searchQuery) ||
+                    (item.grade || '').toLowerCase().includes(searchQuery);
+                return matchGrade && matchSearch;
+            });
+
+            filtered.sort((a, b) => {
+                if (sortBy === 'title') return (a.title || '').localeCompare(b.title || '');
+                if (sortBy === 'grade') return (a.grade || '').localeCompare(b.grade || '');
+                if (sortBy === 'subject') return (a.subject || '').localeCompare(b.subject || '');
+                if (sortBy === 'topic') return (a.topic || '').localeCompare(b.topic || '');
+                return (b.createdAt || 0) - (a.createdAt || 0);
+            });
+
+            if (filtered.length === 0) {
+                grid.innerHTML = `
+                    <div class="col-span-full bg-white rounded-3xl p-10 border border-slate-200 text-center space-y-3">
+                        <div class="w-14 h-14 rounded-2xl bg-blue-50 text-sdBlue-600 flex items-center justify-center mx-auto">
+                            <i data-lucide="folder-open" class="w-7 h-7"></i>
+                        </div>
+                        <h3 class="font-display font-extrabold text-lg text-slate-700">Belum Ada Game Ditemukan</h3>
+                        <p class="text-sm text-slate-500">Silakan buat game edukasi baru atau ubah kata kunci pencarian.</p>
+                    </div>
+                `;
+                lucide.createIcons();
+                return;
+            }
+
+            grid.innerHTML = filtered.map((game) => `
+                <div class="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-4">
+                    <div class="space-y-2.5">
+                        <div class="flex items-center justify-between gap-2">
+                            <span class="px-2.5 py-1 rounded-lg bg-blue-50 text-sdBlue-700 text-xs font-extrabold">${escapeHtml(game.grade || 'SD')}</span>
+                            <span class="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 text-xs font-bold truncate max-w-[160px]">${escapeHtml(game.subject || 'Umum')}</span>
+                        </div>
+                        <h3 class="font-display font-extrabold text-lg text-slate-800 line-clamp-2 leading-snug">${escapeHtml(game.title)}</h3>
+                        <p class="text-xs text-slate-600 line-clamp-2"><strong>Materi:</strong> ${escapeHtml(game.topic || '-')}</p>
+                        <p class="text-[11px] text-slate-400">Oleh: ${escapeHtml(game.author || 'Guru SDN 150 Barru')}</p>
+                    </div>
+
+                    <div class="pt-3 border-t border-slate-100 flex items-center gap-2">
+                        <button onclick="window.location.hash='#play=${encodeURIComponent(game.id)}'" class="flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-sdBlue-600 hover:bg-sdBlue-700 text-white font-bold text-xs transition-all">
+                            <i data-lucide="play" class="w-3.5 h-3.5"></i>
+                            <span>Mainkan</span>
+                        </button>
+                        <button onclick="openShareModal('${escapeHtml(game.id)}')" class="p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all" title="Bagikan">
+                            <i data-lucide="share-2" class="w-4 h-4"></i>
+                        </button>
+                        <button onclick="deleteSavedGame('${escapeHtml(game.id)}', this)" class="p-2.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 transition-all" title="Hapus Game">
+                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+
+            lucide.createIcons();
+        }
+
+        async function deleteSavedGame(gameId, btnEl) {
+            if (!btnEl.dataset.confirmed) {
+                btnEl.dataset.confirmed = 'true';
+                btnEl.classList.remove('bg-red-50', 'text-red-600');
+                btnEl.classList.add('bg-red-600', 'text-white');
+                showToast('Klik tombol hapus sekali lagi untuk mengonfirmasi penghapusan.');
+                setTimeout(() => {
+                    if (btnEl) {
+                        delete btnEl.dataset.confirmed;
+                        btnEl.classList.add('bg-red-50', 'text-red-600');
+                        btnEl.classList.remove('bg-red-600', 'text-white');
+                    }
+                }, 4000);
+                return;
+            }
+
+            try {
+                await gamesRef.child(gameId).remove();
+                showToast('Game berhasil dihapus dari daftar.');
+            } catch (err) {
+                showToast('Gagal menghapus game: ' + err.message);
+            }
+        }
+
+        /**
          * Fungsi Pemanggil Gemini API menggunakan API Key Bawaan Sekolah (Cepat & Anti-Hang)
          */
         async function callGeminiModel(promptText) {
